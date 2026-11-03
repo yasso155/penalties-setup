@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Penalties Setup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}[hidden]{display:none!important}</style>
+<style>
+/* Layout: two columns. Left: steps (Penalties, Fare class, Legs, Preview). Right: current file and export. Orange = Modification, red = Refund. */
+:root{
+  --bg:#EDF0F5; --surface:#FFFFFF; --surface-2:#F5F7FA; --ink:#14202E; --muted:#5A6778; --line:#D3DAE4;
+  --accent:#1F5FBF; --accent-ink:#FFFFFF; --accent-soft:#E3ECFA;
+  --good:#1D7A4B; --warn:#A85A07; --bad:#B3261E;
+  --mod:#C75B07; --mod-soft:#FDEBD9; --ref:#C62F2A; --ref-soft:#FBE3E1;
+  --f-body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1520; --surface:#16202C; --surface-2:#1C2837; --ink:#E5EBF3; --muted:#92A0B3; --line:#2B3A4D;
+    --accent:#6FA4F3; --accent-ink:#0B1626; --accent-soft:#1D2D45;
+    --good:#4CC38A; --warn:#E0A04A; --bad:#F0827A; --mod:#F29A45; --mod-soft:#3A2A1A; --ref:#F2766E; --ref-soft:#3C1F1F; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1520; --surface:#16202C; --surface-2:#1C2837; --ink:#E5EBF3; --muted:#92A0B3; --line:#2B3A4D;
+  --accent:#6FA4F3; --accent-ink:#0B1626; --accent-soft:#1D2D45;
+  --good:#4CC38A; --warn:#E0A04A; --bad:#F0827A; --mod:#F29A45; --mod-soft:#3A2A1A; --ref:#F2766E; --ref-soft:#3C1F1F; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.shell{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 24px;flex-wrap:wrap}
+h1{margin:0;font-size:26px;font-weight:600;text-wrap:balance}
+.sub{margin:2px 0 0;color:var(--muted);font-size:14px}
+.latin{direction:ltr;unicode-bidi:isolate;font-family:var(--f-mono);font-size:.92em}
+.brand img{display:block;height:56px;width:auto}
+.brand-dark{display:none!important}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .brand-light{display:none!important}:root:not([data-theme="light"]) .brand-dark{display:block!important}}
+:root[data-theme="dark"] .brand-light{display:none!important}
+:root[data-theme="dark"] .brand-dark{display:block!important}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.col-main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.col-side{position:sticky;top:12px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.card-h{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.card-h h2{margin:0;font-size:16px;font-weight:600}
+.step{flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-size:13px;font-weight:600;font-family:var(--f-mono)}
+.card-h .hint{margin-inline-start:auto;color:var(--muted);font-size:13px}
+input[type=search],input[type=text],input[type=number],select{font:inherit;color:var(--ink);background:var(--surface-2);
+  border:1px solid var(--line);border-radius:7px;padding:7px 10px;min-height:38px;width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,.pick-row:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.num{direction:ltr;text-align:left;font-family:var(--f-mono)}
+.num.bad{border-color:var(--bad)}
+.sub2 .v-mod{color:var(--mod)} .sub2 .v-ref{color:var(--ref)}
+.err{color:var(--bad);font-size:12.5px;min-height:18px}
+button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:7px 12px;min-height:36px}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.link{border:0;background:none;color:var(--accent);padding:2px 6px;min-height:0}
+.quick button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pick-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.pick-tools .count{margin-inline-start:auto;color:var(--muted);font-size:13px}
+.pick-list{max-height:232px;overflow:auto;border:1px solid var(--line);border-radius:7px;background:var(--surface-2)}
+.pick-row{display:flex;align-items:center;gap:10px;padding:6px 10px;min-height:34px;cursor:pointer;border-bottom:1px solid var(--line)}
+.pick-row:last-child{border-bottom:0}
+.pick-row:hover{background:var(--accent-soft)}
+.pick-row input{width:16px;height:16px;flex:none;accent-color:var(--accent)}
+.pick-row .latin{direction:ltr;text-align:left;flex:1;min-width:0;overflow-wrap:anywhere}
+.empty-note{padding:14px;color:var(--muted);font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border-radius:999px;padding:3px 6px 3px 10px;font-size:13px}
+.chip button{border:0;background:none;padding:0 4px;min-height:0;color:var(--muted);font-size:16px;line-height:1}
+.pen-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.pen-box{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface-2);min-width:0}
+.pen-box h3{margin:0 0 8px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.pen-box h3 .link{margin-inline-start:auto;font-size:12.5px}
+.f-row{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:8px;margin-bottom:2px}
+.lbl{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px}
+.opts{display:flex;gap:16px 24px;flex-wrap:wrap;margin-top:14px;align-items:flex-end}
+.opts .fld{min-width:140px}
+.chk{display:flex;gap:8px;align-items:center;cursor:pointer;min-height:38px}
+.chk input{width:16px;height:16px;accent-color:var(--accent)}
+.fixed-note{color:var(--muted);font-size:13px;margin-top:10px}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:7px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 10px;text-align:start;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--surface-2);font-weight:500;color:var(--muted);font-size:12.5px}
+tr:last-child td{border-bottom:0}
+td.latin,th.latin{direction:ltr;text-align:left}
+.tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;background:var(--accent-soft)}
+.tag.after{background:transparent;border:1px solid var(--line)}
+.add-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.add-bar .why{color:var(--muted);font-size:13px;flex:1;min-width:180px}
+.batch-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.batch-item{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--surface-2);display:flex;gap:8px;align-items:flex-start}
+.batch-item .meta{flex:1;min-width:0;font-size:13.5px}
+.batch-item .meta b{font-weight:600}
+.batch-item .sub2{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+.big{font-size:30px;font-weight:600;font-family:var(--f-mono);line-height:1.1}
+.tot{display:flex;gap:20px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+.tot small{display:block;color:var(--muted);font-size:12.5px;font-family:var(--f-body);font-weight:400}
+.status{min-height:22px;font-size:13px;margin-top:8px}
+.status.ok{color:var(--good)} .status.warn{color:var(--warn)} .status.bad{color:var(--bad)}
+.pen-card{border:1.5px solid var(--accent);padding:20px;display:flex;flex-direction:column;gap:16px}
+.pen-card .card-h{margin:0}
+.cur-wrap{margin-inline-start:auto;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.cur-wrap select{width:96px}
+.pen-card .pen-box{padding:16px}
+.pen-card .pen-box h3{font-size:15px;margin-bottom:6px}
+.pen-card .num{font-size:20px;min-height:48px}
+.pen-card select{min-height:48px}
+.pen-card .f-row{grid-template-columns:minmax(0,1fr) 150px}
+.lbl.mod,.th-mod{color:var(--mod)} .lbl.ref,.th-ref{color:var(--ref)}
+.lbl.mod,.lbl.ref{font-weight:600}
+.num.mod{border-color:var(--mod);background:var(--mod-soft)} .num.ref{border-color:var(--ref);background:var(--ref-soft)}
+.num.mod:focus-visible{outline-color:var(--mod)} .num.ref:focus-visible{outline-color:var(--ref)}
+.num.bad{border-color:var(--bad)}
+td.v-mod{color:var(--mod);font-weight:500} td.v-ref{color:var(--ref);font-weight:500}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.quick button{display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:8px 12px;min-height:56px;text-align:start}
+.quick button b{font-family:var(--f-mono);font-size:20px;line-height:1.2}
+.quick button span{font-size:12px;opacity:.8}
+.quick button.all{grid-column:1/-1;align-items:center;justify-content:center;min-height:40px;font-weight:500}
+details.more>summary{cursor:pointer;color:var(--accent);padding:4px 0;min-height:32px}
+details.more[open]>summary{margin-bottom:6px}
+@media (max-width:900px){.pair{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .col-side{position:static}
+}
+@media (max-width:560px){
+  .pen-grid{grid-template-columns:minmax(0,1fr)}
+  h1{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+
+<div class="shell" dir="ltr">
+  <header class="top">
+    <div>
+      <h1>Penalties Setup</h1>
+    </div>
+    <div class="brand" role="img" aria-label="Yaser Aljaali - ياسر الجعلي">
+      <img class="brand-light" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0yMC44IC0yMC44IDU0Ny4xIDE3MS42IiB3aWR0aD0iNTQ3IiBoZWlnaHQ9IjE3MiI+Cjx0aXRsZT5ZYXNlciBBbGphYWxpIC0g2YrYp9iz2LEg2KfZhNis2LnZhNmKPC90aXRsZT4KPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJndCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiIHgxPSIxMjgiIHkxPSI2MCIgeDI9IjEyOCIgeTI9IjE1MCI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZmJkOThhIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZTQ4YzJlIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImdsIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjEyOCIgeTE9IjEyMCIgeDI9IjEyOCIgeTI9IjIzMCI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjN2ExMDMwIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNGEwYTFmIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImdyIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjEyOCIgeTE9IjEyMCIgeDI9IjEyOCIgeTI9IjIzMCI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjYzI0MTJmIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjOGExNjMyIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0zOS4yMDQgLTQwLjcyMykgc2NhbGUoMC43ODMxKSI+PHBhdGggZmlsbD0idXJsKCNnbCkiIGQ9Ik0xMjguMDAgMTE0LjAwIEw1MC4wNiA2OS4wMCBMNTAuMDYgMTAzLjAwIEw5OC41NiAxMzEuMDAgTDk4LjU2IDIwMS4wMCBMMTI4LjAwIDIxOC4wMCBaIi8+PHBhdGggZmlsbD0idXJsKCNncikiIGQ9Ik0xMjguMDAgMTE0LjAwIEwyMDUuOTQgNjkuMDAgTDIwNS45NCAxMDMuMDAgTDE1Ny40NCAxMzEuMDAgTDE1Ny40NCAyMDEuMDAgTDEyOC4wMCAyMTguMDAgWiIvPjxwYXRoIGZpbGw9InVybCgjZ3QpIiBkPSJNMTI4LjAwIDExNC4wMCBMNTAuMDYgNjkuMDAgTDc5LjUwIDUyLjAwIEwxMjguMDAgODAuMDAgTDE3Ni41MCA1Mi4wMCBMMjA1Ljk0IDY5LjAwIFoiLz48L2c+CjxnIGZpbGw9IiMyMjEwMWEiPjxwYXRoIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE2Ni4yNyA0Mi4zNCkiIGQ9Ik0xMC4yNiAtOS40NyAwLjQ3IC0yNS40Mkg3LjAyTDE0LjU0IC0xMi41M0gxMC4zM0wxNy44NiAtMjUuNDJIMjQuMjZMMTQuNDAgLTkuNDdaTTkuNTggMC4wMFYtMTIuMDZIMTUuMjNWMC4wMFogTTI4LjI2IDAuMDAgMzguMzQgLTI1LjQySDQzLjQ1TDUzLjQyIDAuMDBINDcuNDVMMzkuODIgLTIxLjEwSDQxLjg3TDM0LjEzIDAuMDBaTTMzLjk4IC00LjYxVi05LjIySDQ3Ljg0Vi00LjYxWiBNNjkuNzcgMC40MFE2Ni42NCAwLjQwIDY0LjM5IC0wLjYzUTYyLjE0IC0xLjY2IDYwLjI2IC0zLjc0TDYzLjk0IC03LjM4UTY1LjE2IC01Ljk4IDY2LjY1IC01LjIwUTY4LjE1IC00LjQzIDcwLjEzIC00LjQzUTcxLjkzIC00LjQzIDcyLjkyIC01LjA4UTczLjkxIC01LjcyIDczLjkxIC02Ljg4UTczLjkxIC03LjkyIDczLjI2IC04LjU3UTcyLjYxIC05LjIyIDcxLjU1IC05LjY4UTcwLjQ5IC0xMC4xNSA2OS4yMSAtMTAuNThRNjcuOTMgLTExLjAyIDY2LjY3IC0xMS41N1E2NS40MSAtMTIuMTMgNjQuMzUgLTEyLjk4UTYzLjI5IC0xMy44MiA2Mi42NCAtMTUuMTBRNjEuOTkgLTE2LjM4IDYxLjk5IC0xOC4zMlE2MS45OSAtMjAuNjYgNjMuMTMgLTIyLjM2UTY0LjI2IC0yNC4wNSA2Ni4yOCAtMjQuOTNRNjguMjkgLTI1LjgxIDcwLjkyIC0yNS44MVE3My41OCAtMjUuODEgNzUuODAgLTI0Ljg4UTc4LjAxIC0yMy45NCA3OS40NSAtMjIuMzJMNzUuNzggLTE4LjY4UTc0LjYzIC0xOS44NyA3My40NiAtMjAuNDVRNzIuMjkgLTIxLjAyIDcwLjgxIC0yMS4wMlE2OS4zNCAtMjEuMDIgNjguNDcgLTIwLjQ3UTY3LjYxIC0xOS45MSA2Ny42MSAtMTguODZRNjcuNjEgLTE3Ljg5IDY4LjI2IC0xNy4zMFE2OC45MCAtMTYuNzAgNjkuOTcgLTE2LjI3UTcxLjAzIC0xNS44NCA3Mi4zMSAtMTUuNDFRNzMuNTggLTE0Ljk4IDc0Ljg0IC0xNC40MFE3Ni4xMCAtMTMuODIgNzcuMTcgLTEyLjk0UTc4LjIzIC0xMi4wNiA3OC44OCAtMTAuNzFRNzkuNTIgLTkuMzYgNzkuNTIgLTcuMzhRNzkuNTIgLTMuNzQgNzYuOTMgLTEuNjdRNzQuMzQgMC40MCA2OS43NyAwLjQwWiBNODkuNjAgMC4wMFYtMjUuNDJIOTUuMjZWMC4wMFpNOTMuOTIgMC4wMFYtNC45MEgxMDcuODZWMC4wMFpNOTMuOTIgLTEwLjYyVi0xNS4zNEgxMDYuNjBWLTEwLjYyWk05My45MiAtMjAuNTZWLTI1LjQySDEwNy42OFYtMjAuNTZaIE0xMjIuNTQgLTEwLjQ4Vi0xNC42NUgxMjcuOTFRMTI5LjYwIC0xNC42NSAxMzAuNTIgLTE1LjUyUTEzMS40NCAtMTYuMzggMTMxLjQ0IC0xNy44NlExMzEuNDQgLTE5LjIyIDEzMC41NCAtMjAuMTJRMTI5LjY0IC0yMS4wMiAxMjcuOTQgLTIxLjAySDEyMi41NFYtMjUuNDJIMTI4LjU5UTEzMS4xMSAtMjUuNDIgMTMzLjAyIC0yNC40NlExMzQuOTMgLTIzLjUxIDEzNi4wMSAtMjEuODJRMTM3LjA5IC0yMC4xMiAxMzcuMDkgLTE3LjkzUTEzNy4wOSAtMTUuNzAgMTM2LjAxIC0xNC4wMlExMzQuOTMgLTEyLjM1IDEzMi45OCAtMTEuNDFRMTMxLjA0IC0xMC40OCAxMjguNDEgLTEwLjQ4Wk0xMTguMjIgMC4wMFYtMjUuNDJIMTIzLjg4VjAuMDBaTTEzMi4wNSAwLjAwIDEyNC4xMyAtMTAuOTQgMTI5LjMxIC0xMi4zNSAxMzguNzQgMC4wMFoiLz48cGF0aCB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzMjcuODQgNDIuMzQpIiBkPSJNMS4xMiAwLjAwIDExLjM0IC0yNC45OEgxMy43OUwyMy45OCAwLjAwSDIwLjMwTDExLjkyIC0yMS4xM0gxMy4xOEw0LjcyIDAuMDBaTTUuOTggLTUuNjVWLTguNjBIMTkuMTJWLTUuNjVaIE0zNC4yMCAwLjAwVi0yNC45OEgzNy41OFYwLjAwWk0zNi41MCAwLjAwVi0zLjEwSDQ5LjkwVjAuMDBaIE02NC42MiAwLjM2UTYyLjQ2IDAuMzYgNjAuODIgLTAuNDlRNTkuMTggLTEuMzMgNTguMTQgLTIuNzdMNjAuNTIgLTQuOTdRNjEuMjAgLTMuOTYgNjIuMjMgLTMuNDJRNjMuMjUgLTIuODggNjQuNTEgLTIuODhRNjUuNzcgLTIuODggNjYuNzQgLTMuNDJRNjcuNzIgLTMuOTYgNjguMjcgLTUuMDJRNjguODMgLTYuMDggNjguODMgLTcuNjNWLTI0Ljk4SDcyLjIyVi03LjgxUTcyLjIyIC01LjMzIDcxLjIzIC0zLjQ5UTcwLjI0IC0xLjY2IDY4LjUzIC0wLjY1UTY2LjgyIDAuMzYgNjQuNjIgMC4zNlogTTgxLjY4IDAuMDAgOTEuOTEgLTI0Ljk4SDk0LjM2TDEwNC41NCAwLjAwSDEwMC44N0w5Mi40OCAtMjEuMTNIOTMuNzRMODUuMjggMC4wMFpNODYuNTQgLTUuNjVWLTguNjBIOTkuNjhWLTUuNjVaIE0xMTEuODUgMC4wMCAxMjIuMDggLTI0Ljk4SDEyNC41MkwxMzQuNzEgMC4wMEgxMzEuMDRMMTIyLjY1IC0yMS4xM0gxMjMuOTFMMTE1LjQ1IDAuMDBaTTExNi43MSAtNS42NVYtOC42MEgxMjkuODVWLTUuNjVaIE0xNDQuOTQgMC4wMFYtMjQuOThIMTQ4LjMyVjAuMDBaTTE0Ny4yNCAwLjAwVi0zLjEwSDE2MC42M1YwLjAwWiBNMTcxLjI5IDAuMDBWLTI0Ljk4SDE3NC42N1YwLjAwWiIvPjxwYXRoIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIyOC4yOCA5Ni4xNykiIGQ9Ik0xMS41MyAxNy4zMVExMC40OCAxNy4zMSA5LjgyIDE2LjY1UTkuMTYgMTUuOTkgOS4xNiAxNC43NlE5LjE2IDEzLjU1IDkuODIgMTIuODhRMTAuNDggMTIuMjAgMTEuNTMgMTIuMjBRMTIuNjUgMTIuMjAgMTMuMjcgMTIuODhRMTMuODkgMTMuNTUgMTMuODkgMTQuNzZRMTMuODkgMTUuOTkgMTMuMjUgMTYuNjVRMTIuNjIgMTcuMzEgMTEuNTMgMTcuMzFaTTE3Ljk1IDE3LjMxUTE2Ljg2IDE3LjMxIDE2LjIyIDE2LjYzUTE1LjU4IDE1Ljk2IDE1LjU4IDE0Ljc2UTE1LjU4IDEzLjU5IDE2LjIyIDEyLjkwUTE2Ljg2IDEyLjIwIDE3Ljk1IDEyLjIwUTE5LjA3IDEyLjIwIDE5LjY5IDEyLjkwUTIwLjMxIDEzLjU5IDIwLjMxIDE0Ljc2UTIwLjMxIDE1LjkyIDE5LjY3IDE2LjYxUTE5LjA0IDE3LjMxIDE3Ljk1IDE3LjMxWiBNOS45OSA5LjAxUTcuNzAgOS4wMSA1Ljk5IDcuODhRNC4yOCA2Ljc2IDMuMzYgNC43OVEyLjQ0IDIuODIgMi40NCAwLjMwUTIuNDQgLTEuNTggMi43NCAtMy4zMFEzLjA0IC01LjAzIDMuNjggLTYuODBIOC4wM1E3LjUxIC01LjI2IDcuMzQgLTMuODFRNy4xNyAtMi4zNyA3LjE3IC0wLjM0UTcuMTcgMS4yMCA3Ljc3IDIuNDJROC4zNyAzLjY0IDkuNDIgNC4zNFExMC40OCA1LjAzIDExLjc5IDUuMDNIMTguNDRRMjAuMDUgNS4wMyAyMS4yOSA0Ljc5UTIyLjUzIDQuNTQgMjMuMjYgNC4wMlEyMy45OSAzLjQ5IDIzLjk5IDIuNTlRMjMuOTkgMS44OCAyMy4zNSAxLjM5UTIyLjcyIDAuOTAgMjEuMzYgMC41M1ExOS4zNCAwLjAwIDE4LjA2IC0wLjY5UTE2Ljc4IC0xLjM5IDE2LjE4IC0yLjQyUTE1LjU4IC0zLjQ1IDE1LjU4IC00Ljk2UTE1LjU4IC01Ljk3IDE1Ljk0IC03LjAyUTE2LjMwIC04LjA3IDE2Ljk3IC05LjEyUTE3LjkxIC0xMC41MSAxOS4yMiAtMTEuNjRRMjAuNTQgLTEyLjc3IDIxLjk4IC0xMy40MFEyMy40MyAtMTQuMDQgMjQuNzggLTE0LjA0UTI1LjQyIC0xNC4wNCAyNS45OCAtMTMuOTNRMjYuNTUgLTEzLjgyIDI3LjAzIC0xMy41OVEyOC4yMCAtMTMuMDMgMjkuMjMgLTExLjg4UTMwLjI2IC0xMC43NCAzMS43NiAtOC41MlEzMi43NCAtNy4wMiAzMy41MSAtNi4xMlEzNC4yOCAtNS4yMiAzNC44OCAtNC43N1EzNS40MSAtNC4zOSAzNS45OSAtNC4xOVEzNi41NyAtMy45OCAzNy4yMSAtMy45OEgzNy40MFEzNy41OCAtMy45OCAzNy41OCAtMy44M1YtMC4xOVEzNy41OCAwLjAwIDM3LjQwIDAuMDBIMzcuMjFRMzUuOTcgMC4wMCAzNC45MiAtMC4yNlEzMy44NyAtMC41MyAzMi45MyAtMS4xNlEzMS45OSAtMS44MCAzMC45NCAtMi44NVEzMC43NSAtMy4wNCAzMC4yNiAtMy43MFEyOS43NyAtNC4zNiAyOS4wMiAtNS40MVEyOC4xNiAtNi42NSAyNy40NyAtNy40OVEyNi43NyAtOC4zNCAyNi4yNSAtOC43NVEyNS43NiAtOS4yMCAyNS4yNSAtOS40MVEyNC43NCAtOS42MSAyNC4yOSAtOS42MVEyMy42OSAtOS42MSAyMi45OCAtOS4yMlEyMi4yNyAtOC44MiAyMS42MyAtOC4xOVEyMC45OSAtNy41NSAyMC41OCAtNi44N1EyMC4xNiAtNi4yMCAyMC4xNiAtNS42M1EyMC4xNiAtNS4xNCAyMC40OCAtNC43M1EyMC44MCAtNC4zMiAyMS40MiAtMy45OFEyMi4wNCAtMy42NCAyMi45MCAtMy4zOFEyNC4xOCAtMy4wMCAyNS4wOCAtMi42M1EyNS45OCAtMi4yNSAyNi41OCAtMS45MVEyNy43MSAtMS4yNCAyOC4yOSAtMC4yNlEyOC44NyAwLjcxIDI4Ljg3IDEuOTlRMjguODcgNS40NCAyNi4yNiA3LjIzUTIzLjY1IDkuMDEgMTguNDcgOS4wMVogTTM3LjAyIDAuMDBRMzYuODMgMC4wMCAzNi44MyAtMC4xOVYtMy44M1EzNi44MyAtMy45OCAzNy4wMiAtMy45OEg0MS43OVYtMjguNTRINDYuNjNWLTMuOThINTEuNTFRNTEuNzAgLTMuOTggNTEuNzAgLTMuODNWLTAuMTlRNTEuNzAgMC4wMCA1MS41MSAwLjAwWiBNNjkuNDIgMC4wMFE2Ny43MyAwLjAwIDY1Ljg0IC0wLjU2UTYzLjk0IC0xLjEzIDYyLjQ4IC0yLjAzUTYwLjc5IC0xLjAxIDU5LjA0IC0wLjUxUTU3LjMwIDAuMDAgNTUuNDkgMC4wMEg1MS4xNFE1MC45NSAwLjAwIDUwLjk1IC0wLjE5Vi0zLjgzUTUwLjk1IC0zLjk4IDUxLjE0IC0zLjk4SDU1LjA4UTU2LjA5IC0zLjk4IDU3LjE1IC00LjE5UTU4LjIwIC00LjM5IDU4LjkxIC00LjY5UTU4LjMxIC01LjE0IDU3LjY3IC01Ljg4UTU3LjAzIC02LjYxIDU2LjM2IC03LjU1UTU1LjA0IC05LjQ2IDU0LjA3IC0xMS42OFE1My4wOSAtMTMuODkgNTIuNzUgLTE1LjkyUTU0LjIyIC0xNy4xNiA1NS45NCAtMTguMDZRNTcuNjcgLTE4Ljk2IDU5LjUxIC0xOS40M1E2MS4zNSAtMTkuOTAgNjMuMDggLTE5LjkwUTY1LjY3IC0xOS45MCA2OC4wMyAtMTkuMjhRNzAuNDAgLTE4LjY2IDcyLjM1IC0xNy41MFE3Mi4zNSAtMTQuODMgNzEuNTggLTEyLjM5UTcwLjgxIC05Ljk1IDY5LjQxIC04LjAwUTY4LjAwIC02LjA1IDY2LjA0IC00LjczUTY2Ljg3IC00LjM2IDY3Ljc3IC00LjE3UTY4LjY3IC0zLjk4IDY5LjY5IC0zLjk4SDc0LjA4UTc0LjI3IC0zLjk4IDc0LjI3IC0zLjgzVi0wLjE5UTc0LjI3IDAuMDAgNzQuMDggMC4wMFpNNjIuNTUgLTYuODNRNjQuOTkgLTguMzQgNjYuMjUgLTEwLjM2UTY3LjUxIC0xMi4zOSA2Ny42NiAtMTUuMDJRNjYuNjggLTE1LjQ3IDY1LjUyIC0xNS42OVE2NC4zNiAtMTUuOTIgNjMuMDQgLTE1LjkyUTYyLjE0IC0xNS45MiA2MS4xOCAtMTUuNzFRNjAuMjIgLTE1LjUxIDU5LjMyIC0xNS4xNVE1OC40MiAtMTQuNzkgNTcuNzEgLTE0LjI3UTU4LjA4IC0xMi43NyA1OC43OCAtMTEuMzZRNTkuNDcgLTkuOTUgNjAuNDMgLTguODBRNjEuMzkgLTcuNjYgNjIuNTUgLTYuODNaIE04My4wNSA4Ljk3UTgxLjk2IDguOTcgODEuMzMgOC4zMFE4MC42OSA3LjYyIDgwLjY5IDYuNDJRODAuNjkgNS4yNiA4MS4zMSA0LjU2UTgxLjkzIDMuODcgODMuMDUgMy44N1E4NC4xOCAzLjg3IDg0LjgwIDQuNTZRODUuNDIgNS4yNiA4NS40MiA2LjQyUTg1LjQyIDcuNTggODQuNzggOC4yOFE4NC4xNCA4Ljk3IDgzLjA1IDguOTdaIE03My43MCAwLjAwUTczLjUyIDAuMDAgNzMuNTIgLTAuMTlWLTMuODNRNzMuNTIgLTMuOTggNzMuNzAgLTMuOThIODkuMTdRODguNjkgLTQuNDcgODguMjUgLTUuMjZRODcuODIgLTYuMDUgODcuNTAgLTcuMjFRODcuMTggLTguMzcgODYuODggLTkuODRRODYuNjIgLTExLjI2IDg2LjIzIC0xMi4yMFE4NS44MyAtMTMuMTQgODUuMzIgLTEzLjc0UTg0LjgyIC0xNC4zNCA4NC4wNyAtMTQuNjFRODMuMzIgLTE0Ljg3IDgyLjMwIC0xNC44N1E4MC45OSAtMTQuODcgNzkuNzUgLTE0LjUxUTc4LjUxIC0xNC4xNiA3Ny4xNiAtMTMuNDBMNzUuNTggLTE3LjAxUTc3LjIzIC0xNy45OCA3OS4wNyAtMTguNDJRODAuOTEgLTE4Ljg1IDgyLjk0IC0xOC44NVE4NC4xMCAtMTguODUgODUuMDYgLTE4LjcwUTg2LjAyIC0xOC41NSA4Ni44MSAtMTguMjFRODguMDUgLTE3LjcyIDg4Ljk1IC0xNi44NFE4OS44NSAtMTUuOTYgOTAuNDUgLTE0LjYyUTkxLjA1IC0xMy4yOSA5MS4zNSAtMTEuMzhROTEuNjkgLTkuNTAgOTIuMDggLTguMDNROTIuNDggLTYuNTcgOTIuOTcgLTUuNTZROTMuNDUgLTQuNTQgOTQuMDIgLTMuOThIOTYuNTBROTYuNjggLTMuOTggOTYuNjggLTMuODNWLTAuMTlROTYuNjggMC4wMCA5Ni41MCAwLjAwWiBNOTYuMTIgMC4wMFE5NS45MyAwLjAwIDk1LjkzIC0wLjE5Vi0zLjgzUTk1LjkzIC0zLjk4IDk2LjEyIC0zLjk4SDEwMC44OVYtMjguNTRIMTA1LjczVjAuMDBaIE0xMTMuMjQgLTI4LjU0SDExOC4wOFYwLjAwSDExMy4yNFogIE0xNDYuNDMgMC4wMFYwLjcxUTE0Ni40MyAzLjIzIDE0NS41MyA1LjExUTE0NC42MyA2Ljk4IDE0Mi45OCA4LjAwUTE0MS4zMyA5LjAxIDEzOS4wMCA5LjAxUTEzNy40MiA5LjAxIDEzNi4wMSA4LjYyUTEzNC42MCA4LjIyIDEzMy4xMCA3LjI1TDEzNC45NCAzLjk4UTEzNS44OCA0LjU0IDEzNi41OSA0LjczUTEzNy4zMSA0LjkyIDEzOC4yNSA0LjkyUTEzOS43OSA0LjkyIDE0MC43MyAzLjcwUTE0MS42NiAyLjQ4IDE0MS42NiAwLjYwVi0xOC40N0gxNDYuNDNWLTMuOThIMTUxLjI0UTE1MS40MyAtMy45OCAxNTEuNDMgLTMuODNWLTAuMTlRMTUxLjQzIDAuMDAgMTUxLjI0IDAuMDBaIE0xNzYuOTYgMC4wMFExNzUuMzEgMC4wMCAxNzMuODYgLTAuNjZRMTcyLjQxIC0xLjMxIDE3MC45OSAtMi43NFExNzAuMDEgLTEuNDMgMTY4LjUzIC0wLjcxUTE2Ny4wNSAwLjAwIDE2NC45OCAwLjAwSDE1MC44NlExNTAuNjcgMC4wMCAxNTAuNjcgLTAuMTlWLTMuODNRMTUwLjY3IC0zLjk4IDE1MC44NiAtMy45OEgxNTUuNzhWLTE1LjU0SDE2MC41OVYtMy45OEgxNjQuMDRRMTY1LjkyIC0zLjk4IDE2Ni44MiAtNS4wN1ExNjcuNzIgLTYuMTYgMTY3LjcyIC04LjM0Vi0xNS41NEgxNzIuNTNWLTcuOTZRMTcyLjUzIC03LjU4IDE3Mi41MSAtNy4xOVExNzIuNDkgLTYuODAgMTcyLjQ1IC02LjQyUTE3My4zOSAtNS4wNyAxNzQuMzUgLTQuNTJRMTc1LjMxIC0zLjk4IDE3Ni44OCAtMy45OEgxNzkuMTdWLTE4LjQ3SDE4My45OFYwLjAwWiBNMjAwLjU3IC0zLjk4UTIwMC43MiAtMy45OCAyMDAuNzIgLTMuODNWLTAuMTlRMjAwLjcyIDAuMDAgMjAwLjU0IDAuMDBIMTkwLjkyVi0yOC41NEgxOTUuNzdWLTMuOThaIE0yMDMuOTUgOC4xNVEyMDIuOTAgOC4xNSAyMDIuMjUgNy40OVEyMDEuNTkgNi44MyAyMDEuNTkgNS41OVEyMDEuNTkgNC4zOSAyMDIuMjUgMy43MlEyMDIuOTAgMy4wNCAyMDMuOTUgMy4wNFEyMDUuMDggMy4wNCAyMDUuNzAgMy43MlEyMDYuMzIgNC4zOSAyMDYuMzIgNS41OVEyMDYuMzIgNi44MyAyMDUuNjggNy40OVEyMDUuMDQgOC4xNSAyMDMuOTUgOC4xNVpNMjEwLjM3IDguMTVRMjA5LjI5IDguMTUgMjA4LjY1IDcuNDdRMjA4LjAxIDYuODAgMjA4LjAxIDUuNTlRMjA4LjAxIDQuNDMgMjA4LjY1IDMuNzRRMjA5LjI5IDMuMDQgMjEwLjM3IDMuMDRRMjExLjUwIDMuMDQgMjEyLjEyIDMuNzRRMjEyLjc0IDQuNDMgMjEyLjc0IDUuNTlRMjEyLjc0IDYuNzYgMjEyLjEwIDcuNDVRMjExLjQ2IDguMTUgMjEwLjM3IDguMTVaIE0yMDAuMTYgMC4wMFExOTkuOTcgMC4wMCAxOTkuOTcgLTAuMTlWLTMuODNRMTk5Ljk3IC0zLjk4IDIwMC4xNiAtMy45OEgyMDYuOTZWLTE4LjQ3SDIxMS44MFYwLjAwWiIvPjwvZz4KPC9zdmc+" alt="">
+      <img class="brand-dark" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0yMC44IC0yMC44IDU0Ny4xIDE3MS42IiB3aWR0aD0iNTQ3IiBoZWlnaHQ9IjE3MiI+Cjx0aXRsZT5ZYXNlciBBbGphYWxpIC0g2YrYp9iz2LEg2KfZhNis2LnZhNmKPC90aXRsZT4KPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJndCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiIHgxPSIxMjgiIHkxPSI2MCIgeDI9IjEyOCIgeTI9IjE1MCI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZmJkOThhIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZTQ4YzJlIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImdsIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjEyOCIgeTE9IjEyMCIgeDI9IjEyOCIgeTI9IjIzMCI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjN2ExMDMwIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNGEwYTFmIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImdyIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjEyOCIgeTE9IjEyMCIgeDI9IjEyOCIgeTI9IjIzMCI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjYzI0MTJmIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjOGExNjMyIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+CjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0zOS4yMDQgLTQwLjcyMykgc2NhbGUoMC43ODMxKSI+PHBhdGggZmlsbD0idXJsKCNnbCkiIGQ9Ik0xMjguMDAgMTE0LjAwIEw1MC4wNiA2OS4wMCBMNTAuMDYgMTAzLjAwIEw5OC41NiAxMzEuMDAgTDk4LjU2IDIwMS4wMCBMMTI4LjAwIDIxOC4wMCBaIi8+PHBhdGggZmlsbD0idXJsKCNncikiIGQ9Ik0xMjguMDAgMTE0LjAwIEwyMDUuOTQgNjkuMDAgTDIwNS45NCAxMDMuMDAgTDE1Ny40NCAxMzEuMDAgTDE1Ny40NCAyMDEuMDAgTDEyOC4wMCAyMTguMDAgWiIvPjxwYXRoIGZpbGw9InVybCgjZ3QpIiBkPSJNMTI4LjAwIDExNC4wMCBMNTAuMDYgNjkuMDAgTDc5LjUwIDUyLjAwIEwxMjguMDAgODAuMDAgTDE3Ni41MCA1Mi4wMCBMMjA1Ljk0IDY5LjAwIFoiLz48L2c+CjxnIGZpbGw9IiNmNmVmZTkiPjxwYXRoIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE2Ni4yNyA0Mi4zNCkiIGQ9Ik0xMC4yNiAtOS40NyAwLjQ3IC0yNS40Mkg3LjAyTDE0LjU0IC0xMi41M0gxMC4zM0wxNy44NiAtMjUuNDJIMjQuMjZMMTQuNDAgLTkuNDdaTTkuNTggMC4wMFYtMTIuMDZIMTUuMjNWMC4wMFogTTI4LjI2IDAuMDAgMzguMzQgLTI1LjQySDQzLjQ1TDUzLjQyIDAuMDBINDcuNDVMMzkuODIgLTIxLjEwSDQxLjg3TDM0LjEzIDAuMDBaTTMzLjk4IC00LjYxVi05LjIySDQ3Ljg0Vi00LjYxWiBNNjkuNzcgMC40MFE2Ni42NCAwLjQwIDY0LjM5IC0wLjYzUTYyLjE0IC0xLjY2IDYwLjI2IC0zLjc0TDYzLjk0IC03LjM4UTY1LjE2IC01Ljk4IDY2LjY1IC01LjIwUTY4LjE1IC00LjQzIDcwLjEzIC00LjQzUTcxLjkzIC00LjQzIDcyLjkyIC01LjA4UTczLjkxIC01LjcyIDczLjkxIC02Ljg4UTczLjkxIC03LjkyIDczLjI2IC04LjU3UTcyLjYxIC05LjIyIDcxLjU1IC05LjY4UTcwLjQ5IC0xMC4xNSA2OS4yMSAtMTAuNThRNjcuOTMgLTExLjAyIDY2LjY3IC0xMS41N1E2NS40MSAtMTIuMTMgNjQuMzUgLTEyLjk4UTYzLjI5IC0xMy44MiA2Mi42NCAtMTUuMTBRNjEuOTkgLTE2LjM4IDYxLjk5IC0xOC4zMlE2MS45OSAtMjAuNjYgNjMuMTMgLTIyLjM2UTY0LjI2IC0yNC4wNSA2Ni4yOCAtMjQuOTNRNjguMjkgLTI1LjgxIDcwLjkyIC0yNS44MVE3My41OCAtMjUuODEgNzUuODAgLTI0Ljg4UTc4LjAxIC0yMy45NCA3OS40NSAtMjIuMzJMNzUuNzggLTE4LjY4UTc0LjYzIC0xOS44NyA3My40NiAtMjAuNDVRNzIuMjkgLTIxLjAyIDcwLjgxIC0yMS4wMlE2OS4zNCAtMjEuMDIgNjguNDcgLTIwLjQ3UTY3LjYxIC0xOS45MSA2Ny42MSAtMTguODZRNjcuNjEgLTE3Ljg5IDY4LjI2IC0xNy4zMFE2OC45MCAtMTYuNzAgNjkuOTcgLTE2LjI3UTcxLjAzIC0xNS44NCA3Mi4zMSAtMTUuNDFRNzMuNTggLTE0Ljk4IDc0Ljg0IC0xNC40MFE3Ni4xMCAtMTMuODIgNzcuMTcgLTEyLjk0UTc4LjIzIC0xMi4wNiA3OC44OCAtMTAuNzFRNzkuNTIgLTkuMzYgNzkuNTIgLTcuMzhRNzkuNTIgLTMuNzQgNzYuOTMgLTEuNjdRNzQuMzQgMC40MCA2OS43NyAwLjQwWiBNODkuNjAgMC4wMFYtMjUuNDJIOTUuMjZWMC4wMFpNOTMuOTIgMC4wMFYtNC45MEgxMDcuODZWMC4wMFpNOTMuOTIgLTEwLjYyVi0xNS4zNEgxMDYuNjBWLTEwLjYyWk05My45MiAtMjAuNTZWLTI1LjQySDEwNy42OFYtMjAuNTZaIE0xMjIuNTQgLTEwLjQ4Vi0xNC42NUgxMjcuOTFRMTI5LjYwIC0xNC42NSAxMzAuNTIgLTE1LjUyUTEzMS40NCAtMTYuMzggMTMxLjQ0IC0xNy44NlExMzEuNDQgLTE5LjIyIDEzMC41NCAtMjAuMTJRMTI5LjY0IC0yMS4wMiAxMjcuOTQgLTIxLjAySDEyMi41NFYtMjUuNDJIMTI4LjU5UTEzMS4xMSAtMjUuNDIgMTMzLjAyIC0yNC40NlExMzQuOTMgLTIzLjUxIDEzNi4wMSAtMjEuODJRMTM3LjA5IC0yMC4xMiAxMzcuMDkgLTE3LjkzUTEzNy4wOSAtMTUuNzAgMTM2LjAxIC0xNC4wMlExMzQuOTMgLTEyLjM1IDEzMi45OCAtMTEuNDFRMTMxLjA0IC0xMC40OCAxMjguNDEgLTEwLjQ4Wk0xMTguMjIgMC4wMFYtMjUuNDJIMTIzLjg4VjAuMDBaTTEzMi4wNSAwLjAwIDEyNC4xMyAtMTAuOTQgMTI5LjMxIC0xMi4zNSAxMzguNzQgMC4wMFoiLz48cGF0aCB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzMjcuODQgNDIuMzQpIiBkPSJNMS4xMiAwLjAwIDExLjM0IC0yNC45OEgxMy43OUwyMy45OCAwLjAwSDIwLjMwTDExLjkyIC0yMS4xM0gxMy4xOEw0LjcyIDAuMDBaTTUuOTggLTUuNjVWLTguNjBIMTkuMTJWLTUuNjVaIE0zNC4yMCAwLjAwVi0yNC45OEgzNy41OFYwLjAwWk0zNi41MCAwLjAwVi0zLjEwSDQ5LjkwVjAuMDBaIE02NC42MiAwLjM2UTYyLjQ2IDAuMzYgNjAuODIgLTAuNDlRNTkuMTggLTEuMzMgNTguMTQgLTIuNzdMNjAuNTIgLTQuOTdRNjEuMjAgLTMuOTYgNjIuMjMgLTMuNDJRNjMuMjUgLTIuODggNjQuNTEgLTIuODhRNjUuNzcgLTIuODggNjYuNzQgLTMuNDJRNjcuNzIgLTMuOTYgNjguMjcgLTUuMDJRNjguODMgLTYuMDggNjguODMgLTcuNjNWLTI0Ljk4SDcyLjIyVi03LjgxUTcyLjIyIC01LjMzIDcxLjIzIC0zLjQ5UTcwLjI0IC0xLjY2IDY4LjUzIC0wLjY1UTY2LjgyIDAuMzYgNjQuNjIgMC4zNlogTTgxLjY4IDAuMDAgOTEuOTEgLTI0Ljk4SDk0LjM2TDEwNC41NCAwLjAwSDEwMC44N0w5Mi40OCAtMjEuMTNIOTMuNzRMODUuMjggMC4wMFpNODYuNTQgLTUuNjVWLTguNjBIOTkuNjhWLTUuNjVaIE0xMTEuODUgMC4wMCAxMjIuMDggLTI0Ljk4SDEyNC41MkwxMzQuNzEgMC4wMEgxMzEuMDRMMTIyLjY1IC0yMS4xM0gxMjMuOTFMMTE1LjQ1IDAuMDBaTTExNi43MSAtNS42NVYtOC42MEgxMjkuODVWLTUuNjVaIE0xNDQuOTQgMC4wMFYtMjQuOThIMTQ4LjMyVjAuMDBaTTE0Ny4yNCAwLjAwVi0zLjEwSDE2MC42M1YwLjAwWiBNMTcxLjI5IDAuMDBWLTI0Ljk4SDE3NC42N1YwLjAwWiIvPjxwYXRoIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIyOC4yOCA5Ni4xNykiIGQ9Ik0xMS41MyAxNy4zMVExMC40OCAxNy4zMSA5LjgyIDE2LjY1UTkuMTYgMTUuOTkgOS4xNiAxNC43NlE5LjE2IDEzLjU1IDkuODIgMTIuODhRMTAuNDggMTIuMjAgMTEuNTMgMTIuMjBRMTIuNjUgMTIuMjAgMTMuMjcgMTIuODhRMTMuODkgMTMuNTUgMTMuODkgMTQuNzZRMTMuODkgMTUuOTkgMTMuMjUgMTYuNjVRMTIuNjIgMTcuMzEgMTEuNTMgMTcuMzFaTTE3Ljk1IDE3LjMxUTE2Ljg2IDE3LjMxIDE2LjIyIDE2LjYzUTE1LjU4IDE1Ljk2IDE1LjU4IDE0Ljc2UTE1LjU4IDEzLjU5IDE2LjIyIDEyLjkwUTE2Ljg2IDEyLjIwIDE3Ljk1IDEyLjIwUTE5LjA3IDEyLjIwIDE5LjY5IDEyLjkwUTIwLjMxIDEzLjU5IDIwLjMxIDE0Ljc2UTIwLjMxIDE1LjkyIDE5LjY3IDE2LjYxUTE5LjA0IDE3LjMxIDE3Ljk1IDE3LjMxWiBNOS45OSA5LjAxUTcuNzAgOS4wMSA1Ljk5IDcuODhRNC4yOCA2Ljc2IDMuMzYgNC43OVEyLjQ0IDIuODIgMi40NCAwLjMwUTIuNDQgLTEuNTggMi43NCAtMy4zMFEzLjA0IC01LjAzIDMuNjggLTYuODBIOC4wM1E3LjUxIC01LjI2IDcuMzQgLTMuODFRNy4xNyAtMi4zNyA3LjE3IC0wLjM0UTcuMTcgMS4yMCA3Ljc3IDIuNDJROC4zNyAzLjY0IDkuNDIgNC4zNFExMC40OCA1LjAzIDExLjc5IDUuMDNIMTguNDRRMjAuMDUgNS4wMyAyMS4yOSA0Ljc5UTIyLjUzIDQuNTQgMjMuMjYgNC4wMlEyMy45OSAzLjQ5IDIzLjk5IDIuNTlRMjMuOTkgMS44OCAyMy4zNSAxLjM5UTIyLjcyIDAuOTAgMjEuMzYgMC41M1ExOS4zNCAwLjAwIDE4LjA2IC0wLjY5UTE2Ljc4IC0xLjM5IDE2LjE4IC0yLjQyUTE1LjU4IC0zLjQ1IDE1LjU4IC00Ljk2UTE1LjU4IC01Ljk3IDE1Ljk0IC03LjAyUTE2LjMwIC04LjA3IDE2Ljk3IC05LjEyUTE3LjkxIC0xMC41MSAxOS4yMiAtMTEuNjRRMjAuNTQgLTEyLjc3IDIxLjk4IC0xMy40MFEyMy40MyAtMTQuMDQgMjQuNzggLTE0LjA0UTI1LjQyIC0xNC4wNCAyNS45OCAtMTMuOTNRMjYuNTUgLTEzLjgyIDI3LjAzIC0xMy41OVEyOC4yMCAtMTMuMDMgMjkuMjMgLTExLjg4UTMwLjI2IC0xMC43NCAzMS43NiAtOC41MlEzMi43NCAtNy4wMiAzMy41MSAtNi4xMlEzNC4yOCAtNS4yMiAzNC44OCAtNC43N1EzNS40MSAtNC4zOSAzNS45OSAtNC4xOVEzNi41NyAtMy45OCAzNy4yMSAtMy45OEgzNy40MFEzNy41OCAtMy45OCAzNy41OCAtMy44M1YtMC4xOVEzNy41OCAwLjAwIDM3LjQwIDAuMDBIMzcuMjFRMzUuOTcgMC4wMCAzNC45MiAtMC4yNlEzMy44NyAtMC41MyAzMi45MyAtMS4xNlEzMS45OSAtMS44MCAzMC45NCAtMi44NVEzMC43NSAtMy4wNCAzMC4yNiAtMy43MFEyOS43NyAtNC4zNiAyOS4wMiAtNS40MVEyOC4xNiAtNi42NSAyNy40NyAtNy40OVEyNi43NyAtOC4zNCAyNi4yNSAtOC43NVEyNS43NiAtOS4yMCAyNS4yNSAtOS40MVEyNC43NCAtOS42MSAyNC4yOSAtOS42MVEyMy42OSAtOS42MSAyMi45OCAtOS4yMlEyMi4yNyAtOC44MiAyMS42MyAtOC4xOVEyMC45OSAtNy41NSAyMC41OCAtNi44N1EyMC4xNiAtNi4yMCAyMC4xNiAtNS42M1EyMC4xNiAtNS4xNCAyMC40OCAtNC43M1EyMC44MCAtNC4zMiAyMS40MiAtMy45OFEyMi4wNCAtMy42NCAyMi45MCAtMy4zOFEyNC4xOCAtMy4wMCAyNS4wOCAtMi42M1EyNS45OCAtMi4yNSAyNi41OCAtMS45MVEyNy43MSAtMS4yNCAyOC4yOSAtMC4yNlEyOC44NyAwLjcxIDI4Ljg3IDEuOTlRMjguODcgNS40NCAyNi4yNiA3LjIzUTIzLjY1IDkuMDEgMTguNDcgOS4wMVogTTM3LjAyIDAuMDBRMzYuODMgMC4wMCAzNi44MyAtMC4xOVYtMy44M1EzNi44MyAtMy45OCAzNy4wMiAtMy45OEg0MS43OVYtMjguNTRINDYuNjNWLTMuOThINTEuNTFRNTEuNzAgLTMuOTggNTEuNzAgLTMuODNWLTAuMTlRNTEuNzAgMC4wMCA1MS41MSAwLjAwWiBNNjkuNDIgMC4wMFE2Ny43MyAwLjAwIDY1Ljg0IC0wLjU2UTYzLjk0IC0xLjEzIDYyLjQ4IC0yLjAzUTYwLjc5IC0xLjAxIDU5LjA0IC0wLjUxUTU3LjMwIDAuMDAgNTUuNDkgMC4wMEg1MS4xNFE1MC45NSAwLjAwIDUwLjk1IC0wLjE5Vi0zLjgzUTUwLjk1IC0zLjk4IDUxLjE0IC0zLjk4SDU1LjA4UTU2LjA5IC0zLjk4IDU3LjE1IC00LjE5UTU4LjIwIC00LjM5IDU4LjkxIC00LjY5UTU4LjMxIC01LjE0IDU3LjY3IC01Ljg4UTU3LjAzIC02LjYxIDU2LjM2IC03LjU1UTU1LjA0IC05LjQ2IDU0LjA3IC0xMS42OFE1My4wOSAtMTMuODkgNTIuNzUgLTE1LjkyUTU0LjIyIC0xNy4xNiA1NS45NCAtMTguMDZRNTcuNjcgLTE4Ljk2IDU5LjUxIC0xOS40M1E2MS4zNSAtMTkuOTAgNjMuMDggLTE5LjkwUTY1LjY3IC0xOS45MCA2OC4wMyAtMTkuMjhRNzAuNDAgLTE4LjY2IDcyLjM1IC0xNy41MFE3Mi4zNSAtMTQuODMgNzEuNTggLTEyLjM5UTcwLjgxIC05Ljk1IDY5LjQxIC04LjAwUTY4LjAwIC02LjA1IDY2LjA0IC00LjczUTY2Ljg3IC00LjM2IDY3Ljc3IC00LjE3UTY4LjY3IC0zLjk4IDY5LjY5IC0zLjk4SDc0LjA4UTc0LjI3IC0zLjk4IDc0LjI3IC0zLjgzVi0wLjE5UTc0LjI3IDAuMDAgNzQuMDggMC4wMFpNNjIuNTUgLTYuODNRNjQuOTkgLTguMzQgNjYuMjUgLTEwLjM2UTY3LjUxIC0xMi4zOSA2Ny42NiAtMTUuMDJRNjYuNjggLTE1LjQ3IDY1LjUyIC0xNS42OVE2NC4zNiAtMTUuOTIgNjMuMDQgLTE1LjkyUTYyLjE0IC0xNS45MiA2MS4xOCAtMTUuNzFRNjAuMjIgLTE1LjUxIDU5LjMyIC0xNS4xNVE1OC40MiAtMTQuNzkgNTcuNzEgLTE0LjI3UTU4LjA4IC0xMi43NyA1OC43OCAtMTEuMzZRNTkuNDcgLTkuOTUgNjAuNDMgLTguODBRNjEuMzkgLTcuNjYgNjIuNTUgLTYuODNaIE04My4wNSA4Ljk3UTgxLjk2IDguOTcgODEuMzMgOC4zMFE4MC42OSA3LjYyIDgwLjY5IDYuNDJRODAuNjkgNS4yNiA4MS4zMSA0LjU2UTgxLjkzIDMuODcgODMuMDUgMy44N1E4NC4xOCAzLjg3IDg0LjgwIDQuNTZRODUuNDIgNS4yNiA4NS40MiA2LjQyUTg1LjQyIDcuNTggODQuNzggOC4yOFE4NC4xNCA4Ljk3IDgzLjA1IDguOTdaIE03My43MCAwLjAwUTczLjUyIDAuMDAgNzMuNTIgLTAuMTlWLTMuODNRNzMuNTIgLTMuOTggNzMuNzAgLTMuOThIODkuMTdRODguNjkgLTQuNDcgODguMjUgLTUuMjZRODcuODIgLTYuMDUgODcuNTAgLTcuMjFRODcuMTggLTguMzcgODYuODggLTkuODRRODYuNjIgLTExLjI2IDg2LjIzIC0xMi4yMFE4NS44MyAtMTMuMTQgODUuMzIgLTEzLjc0UTg0LjgyIC0xNC4zNCA4NC4wNyAtMTQuNjFRODMuMzIgLTE0Ljg3IDgyLjMwIC0xNC44N1E4MC45OSAtMTQuODcgNzkuNzUgLTE0LjUxUTc4LjUxIC0xNC4xNiA3Ny4xNiAtMTMuNDBMNzUuNTggLTE3LjAxUTc3LjIzIC0xNy45OCA3OS4wNyAtMTguNDJRODAuOTEgLTE4Ljg1IDgyLjk0IC0xOC44NVE4NC4xMCAtMTguODUgODUuMDYgLTE4LjcwUTg2LjAyIC0xOC41NSA4Ni44MSAtMTguMjFRODguMDUgLTE3LjcyIDg4Ljk1IC0xNi44NFE4OS44NSAtMTUuOTYgOTAuNDUgLTE0LjYyUTkxLjA1IC0xMy4yOSA5MS4zNSAtMTEuMzhROTEuNjkgLTkuNTAgOTIuMDggLTguMDNROTIuNDggLTYuNTcgOTIuOTcgLTUuNTZROTMuNDUgLTQuNTQgOTQuMDIgLTMuOThIOTYuNTBROTYuNjggLTMuOTggOTYuNjggLTMuODNWLTAuMTlROTYuNjggMC4wMCA5Ni41MCAwLjAwWiBNOTYuMTIgMC4wMFE5NS45MyAwLjAwIDk1LjkzIC0wLjE5Vi0zLjgzUTk1LjkzIC0zLjk4IDk2LjEyIC0zLjk4SDEwMC44OVYtMjguNTRIMTA1LjczVjAuMDBaIE0xMTMuMjQgLTI4LjU0SDExOC4wOFYwLjAwSDExMy4yNFogIE0xNDYuNDMgMC4wMFYwLjcxUTE0Ni40MyAzLjIzIDE0NS41MyA1LjExUTE0NC42MyA2Ljk4IDE0Mi45OCA4LjAwUTE0MS4zMyA5LjAxIDEzOS4wMCA5LjAxUTEzNy40MiA5LjAxIDEzNi4wMSA4LjYyUTEzNC42MCA4LjIyIDEzMy4xMCA3LjI1TDEzNC45NCAzLjk4UTEzNS44OCA0LjU0IDEzNi41OSA0LjczUTEzNy4zMSA0LjkyIDEzOC4yNSA0LjkyUTEzOS43OSA0LjkyIDE0MC43MyAzLjcwUTE0MS42NiAyLjQ4IDE0MS42NiAwLjYwVi0xOC40N0gxNDYuNDNWLTMuOThIMTUxLjI0UTE1MS40MyAtMy45OCAxNTEuNDMgLTMuODNWLTAuMTlRMTUxLjQzIDAuMDAgMTUxLjI0IDAuMDBaIE0xNzYuOTYgMC4wMFExNzUuMzEgMC4wMCAxNzMuODYgLTAuNjZRMTcyLjQxIC0xLjMxIDE3MC45OSAtMi43NFExNzAuMDEgLTEuNDMgMTY4LjUzIC0wLjcxUTE2Ny4wNSAwLjAwIDE2NC45OCAwLjAwSDE1MC44NlExNTAuNjcgMC4wMCAxNTAuNjcgLTAuMTlWLTMuODNRMTUwLjY3IC0zLjk4IDE1MC44NiAtMy45OEgxNTUuNzhWLTE1LjU0SDE2MC41OVYtMy45OEgxNjQuMDRRMTY1LjkyIC0zLjk4IDE2Ni44MiAtNS4wN1ExNjcuNzIgLTYuMTYgMTY3LjcyIC04LjM0Vi0xNS41NEgxNzIuNTNWLTcuOTZRMTcyLjUzIC03LjU4IDE3Mi41MSAtNy4xOVExNzIuNDkgLTYuODAgMTcyLjQ1IC02LjQyUTE3My4zOSAtNS4wNyAxNzQuMzUgLTQuNTJRMTc1LjMxIC0zLjk4IDE3Ni44OCAtMy45OEgxNzkuMTdWLTE4LjQ3SDE4My45OFYwLjAwWiBNMjAwLjU3IC0zLjk4UTIwMC43MiAtMy45OCAyMDAuNzIgLTMuODNWLTAuMTlRMjAwLjcyIDAuMDAgMjAwLjU0IDAuMDBIMTkwLjkyVi0yOC41NEgxOTUuNzdWLTMuOThaIE0yMDMuOTUgOC4xNVEyMDIuOTAgOC4xNSAyMDIuMjUgNy40OVEyMDEuNTkgNi44MyAyMDEuNTkgNS41OVEyMDEuNTkgNC4zOSAyMDIuMjUgMy43MlEyMDIuOTAgMy4wNCAyMDMuOTUgMy4wNFEyMDUuMDggMy4wNCAyMDUuNzAgMy43MlEyMDYuMzIgNC4zOSAyMDYuMzIgNS41OVEyMDYuMzIgNi44MyAyMDUuNjggNy40OVEyMDUuMDQgOC4xNSAyMDMuOTUgOC4xNVpNMjEwLjM3IDguMTVRMjA5LjI5IDguMTUgMjA4LjY1IDcuNDdRMjA4LjAxIDYuODAgMjA4LjAxIDUuNTlRMjA4LjAxIDQuNDMgMjA4LjY1IDMuNzRRMjA5LjI5IDMuMDQgMjEwLjM3IDMuMDRRMjExLjUwIDMuMDQgMjEyLjEyIDMuNzRRMjEyLjc0IDQuNDMgMjEyLjc0IDUuNTlRMjEyLjc0IDYuNzYgMjEyLjEwIDcuNDVRMjExLjQ2IDguMTUgMjEwLjM3IDguMTVaIE0yMDAuMTYgMC4wMFExOTkuOTcgMC4wMCAxOTkuOTcgLTAuMTlWLTMuODNRMTk5Ljk3IC0zLjk4IDIwMC4xNiAtMy45OEgyMDYuOTZWLTE4LjQ3SDIxMS44MFYwLjAwWiIvPjwvZz4KPC9zdmc+" alt="">
+    </div>
+  </header>
+
+  <main class="grid">
+    <div class="col-main">
+      <section class="card pen-card" aria-labelledby="h-pen">
+        <div class="card-h"><span class="step">1</span><h2 id="h-pen">Penalties</h2>
+          <div class="cur-wrap"><label for="cur">Currency</label><select id="cur"></select></div>
+        </div>
+        <div class="pen-grid">
+          <div class="pen-box" id="box-Before"></div>
+          <div class="pen-box" id="box-After"></div>
+        </div>
+        <label class="chk" for="infant"><input type="checkbox" id="infant"> Include Infant rows with zero penalty</label>
+      </section>
+
+      <div class="pair">
+        <section class="card" aria-labelledby="h-fare">
+          <div class="card-h"><span class="step">2</span><h2 id="h-fare">Fare class</h2></div>
+          <div class="quick" id="fare-quick" role="group" aria-label="Main fare classes"></div>
+          <details class="more" id="fare-more"><summary>All fare classes</summary><div id="fare-picker"></div></details>
+        </section>
+
+        <section class="card" aria-labelledby="h-leg">
+          <div class="card-h"><span class="step">3</span><h2 id="h-leg">Legs</h2></div>
+          <div id="leg-picker"></div>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="h-prev">
+        <div class="card-h"><h2 id="h-prev">Row preview</h2><span class="hint" id="prev-count"></span></div>
+        <div class="table-wrap"><table id="prev-table"></table></div>
+        <div class="add-bar">
+          <button class="primary" id="btn-add" type="button">Add to file</button>
+          <span class="why" id="why"></span>
+        </div>
+      </section>
+    </div>
+
+    <aside class="col-side">
+      <section class="card" aria-labelledby="h-batch">
+        <div class="card-h"><h2 id="h-batch">Current file</h2><button class="link" id="btn-clear" type="button">Clear all</button></div>
+        <div class="tot">
+          <div><span class="big" id="tot-rows">0</span><small>rows</small></div>
+          <div><span class="big" id="tot-rules">0</span><small>groups</small></div>
+        </div>
+        <ul class="batch-list" id="batch-list"></ul>
+        <div class="add-bar"><button class="primary" id="btn-export" type="button">Export Excel</button></div>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* ===== Core: reference codes, row generation, workbook (no DOM) ===== */
+const REF = {"action": [["Add", 1], ["Update", 2], ["Delete", 3]], "fare": [["12SF-12-SF", 261], ["2A-EcoNt-2A", 417], ["2N-EcoNt-2N", 414], ["2W-Economy (W)", 413], ["2Y-Economy (Y)", 322], ["3w-EcoNt-3W", 418], ["3Y-EcoNt-3Y", 317], ["5A-EcoNt-5A", 446], ["5W-Economy-5W", 321], ["6W-EcoNt-6W", 415], ["A-Economy (A)", 113], ["A1-A1-Eco Class", 114], ["A2-A2-Eco Class", 116], ["AE-A-AS (Economy Class)", 405], ["AH-A-AH (High Fare)", 406], ["AIET-A Interline", 380], ["AJ-A-AJ (Business Class)", 407], ["AM-AMM-Economy Class", 235], ["AM2-AMM - ECO CLASS", 307], ["AMM2-AMM2-ECOCLASS", 310], ["ap-amm-pzu", 211], ["APP-AMM-APP", 295], ["AS-AS-Eco Class", 208], ["AS1-AS1-Eco Class", 281], ["AS2-AS2-Eco Class", 279], ["AS3-AS3-Eco class", 280], ["AS4-AS4-Eco Class", 282], ["ASCI-ASCI-LOW FARE", 434], ["ASE-LOW FARE", 453], ["ASM-ASM - Low Fare", 236], ["ASMRA-ASM-HIGHT FARE", 324], ["ASOV-OVER CLASS", 435], ["ASV-Economy (AS)", 439], ["ASVC-Economy (YS)", 440], ["AT-A-AT (Low Fare)", 408], ["AUAE-OFFER CLASS", 351], ["AX-A-DiscountedFare", 438], ["AY-A-AY (Full Fare)", 409], ["B-Economy (B)", 10], ["B0-B-Eco (IA)", 176], ["B1-B-Low Fare", 185], ["B2-B-Eco class", 174], ["B3-B-Full fare", 169], ["B5-Charter Class-free", 175], ["BCEV-JEV - Business Class", 362], ["BE-B - Economy Class", 306], ["BIET-B Interline", 381], ["C-C - Business class", 112], ["CB-C-Business Class", 142], ["Cd-C-Business", 218], ["CIET-C Interline", 382], ["CUAE-C - Business Class", 345], ["D-Business-D", 166], ["D0-economy class", 331], ["D7-GD DISCOUNT", 285], ["DE-DOH-EV", 290], ["DEP-D - INAD", 337], ["DF-JBC - Diplomatic Fare", 365], ["DIET-D Interline", 383], ["E-E-Eco Class", 13], ["EIET-E Interline", 384], ["EQQ-EQQ - Economy Class", 377], ["ER-E - Eco Class (RT)", 231], ["ERI-ASM-FULL FARE", 257], ["ERIT-ASM- High Class", 430], ["ERIT2-Economy (KS)", 431], ["EU-E - Umrah Fare", 229], ["EV-E - ECO CLASS", 360], ["EVA-NDJ-Evacuation", 291], ["EX-E - Extra Special Offer", 65], ["F-ECO FARE", 369], ["F1-LUXURY CLASS", 370], ["F2-FULL FARE", 371], ["FF-Free - Only Taxes", 219], ["FI-ECONOMIC FARE", 294], ["FIET-F Interline", 385], ["FS-Smart Fare", 441], ["FX-FELIX", 125], ["G-G - Group Fare", 15], ["g14-gm-Eco class", 232], ["Ga-G-Eco Class", 215], ["Gb-G-Full Fare", 216], ["GI-G-Special price", 309], ["GIET-G Interline", 386], ["Gl-G-Low Fare", 217], ["GS-A-Eco Class", 173], ["Gsp-G-Special fare", 220], ["GU-G-UMRAH FARE", 359], ["GUAE-G - Economy Class RT", 348], ["H-H - High Fare", 16], ["H0-HAJJ FARE - UYL", 190], ["H1-H_high fare", 52], ["H10-HAJJ GROUP FARE", 335], ["H4-FSR-H", 193], ["H5-UYL-H", 194], ["H55-H-Economy Class", 252], ["H6-DAMA-H", 195], ["H7-DON-H", 196], ["H9-HAJJ FARE INDIVIDUAL", 270], ["HA-HAJJ-ASM", 265], ["haj-HAAJ-Eco class", 130], ["HAJJ-HAJJ FARE", 192], ["Hh-HAJJ FARE OW", 191], ["HIET-H Interline", 387], ["HJ6-Business Hajj Fare", 269], ["HJ7-HAJJ-MD", 262], ["HJ8-HAJJ-ECO", 263], ["HJJ-HAJJ GROUP", 266], ["HU-H - Umrah fare", 251], ["HUAE-H - High Fare Economy Class", 341], ["HUMRA-H - Umrah Group", 155], ["I-I - Economy", 422], ["ID90-ID90%", 376], ["IIET-I Interline", 427], ["J-J - Business Class", 18], ["J3-Business Class", 121], ["J47-Business - JN", 330], ["J6-J - Business-Upgraded", 325], ["JAS-JAS-BUSINESS CLASS", 258], ["JB-B - Business Class", 44], ["JBC-J - Business Class (RT)", 241], ["JIET-J Interline", 388], ["jj-j-Business class", 222], ["JS-J- Business", 160], ["JU-J - Business Fare", 286], ["JUAE-J - Business Class Premium", 346], ["Jupgrd-J - Upgraded-Business", 451], ["JWCHC-J - WCHC Business Class", 210], ["K-K - Economy Class (RT)", 86], ["K1-k1-Eco Class", 206], ["K2-K_Eco Class", 46], ["K5-K-Economy Class (N-R -M)", 189], ["k50-k eco", 373], ["KA-K-ECONOMY CLASS", 304], ["KAA-k Economy class", 372], ["KIET-K Interline", 389], ["KK-K-high fare", 305], ["KM-K - Umrah fare", 287], ["KNG-K - UG OFFER", 358], ["Ko-K - Economy Class", 152], ["KR-K - Transit Fare (0 kg)", 171], ["KT-K - Eco Nas Transit (0 KG)", 366], ["KUAE-K - ECOnomy Class", 339], ["LIET-L Interline", 390], ["LIUAE-LITE", 355], ["lk-L-Economy Class (NR)", 212], ["LM-M - Umrah fare", 357], ["LO-L - U mrah Low Fare ow", 187], ["LOA-Legend Of Africa", 274], ["Low-P_ Economy  Class", 135], ["LUAE-L - LOW FARE", 338], ["M-M - Med Fare", 21], ["Medical-Medical Fare", 128], ["MF-M - Medium Fare (RT)", 250], ["MIET-M Interline", 391], ["MU-Y - Eco Multi City Fare", 356], ["N-Economy (N)", 314], ["N50-N5", 315], ["N8-SSD-5", 138], ["N90-SSD-ECLF", 328], ["NA-R_Economy  Class", 237], ["ND-N- Economy  Class (NR NM)", 54], ["NDJ-F - Eco Class (RT)", 238], ["ndj1-NDJ- ONE WAY", 67], ["Nex-N-exchange", 429], ["NIET-N Interline", 392], ["Nm-N - Eco class", 172], ["O-O_Eco Class", 96], ["O1-OE1", 165], ["OB-OMRAH-Business Class", 144], ["oe-O - Eco Class", 158], ["OIET-O Interline", 393], ["OPZUFS-OFFICE OFFER", 367], ["OPZUIF-L - OFFICE ECONOMY CLASS", 368], ["OPZUZ-P -  OFFICE PROMO FARE", 375], ["or-O - Eco Class (RT)", 170], ["oragro-omrahgroub", 143], ["OT-O - Economy  Class( RT )", 163], ["OTS-J - Business Class (OTS)", 278], ["OUAE-O - Economy Class(RT)", 347], ["P-P - Economy Class(RT)", 273], ["p0-P- Promo Fare", 313], ["P1-PROMO FARE", 349], ["p5-P - Economy Class", 161], ["PIET-P Interline", 394], ["PR-P - ECONOMY (RT)", 181], ["PUAE-P - Premium Economy Class", 343], ["PZUEV-L - ECONOMY CLASS", 361], ["PZUEVFSK-OFFER", 364], ["PZUEVZKG-P - PROMO FARE", 363], ["Q-Q3TOW", 147], ["Q2-Q_Eco Class", 97], ["qa-qa-ade", 180], ["QF-QF-FULL FARE", 34], ["QF2-QF_Full Fare", 184], ["QIET-Q Interline", 395], ["QL2-Ql_lowfare", 178], ["QO-KSA - Umrah Individuals", 154], ["QUAE-Q - ECONOMY CLASS RT", 354], ["qw-Q-Economy Class (RT)", 213], ["R-R - UG ECONOMY CLASSE", 102], ["R1-R1 - Economy Class", 85], ["r12-R-Economy Class", 157], ["R2-R2 - Economy Class", 99], ["R3-R3 - Economy Class", 100], ["RB-RECO CLASS", 272], ["RCAI-RCAI - Economy Class", 448], ["REBB-REBB - UG GROUP FARE", 275], ["RIET-R Interline", 396], ["RL-RLOWJUB", 248], ["RLOWFAR-R-LOWFARE", 109], ["RM-RMIDJUB", 249], ["RO-RO", 101], ["Row-R-ow", 103], ["RP-R- PROMO FARE", 442], ["RQT-RQT- Economy Class", 452], ["RR-RR - Economy Class", 332], ["RRR-RRR - Economy Class", 378], ["RRRR-RRRR - Economy Class", 379], ["RRU-RRU - Economy Class", 449], ["RS-RS - Special Fare", 423], ["RT-RT - Eco Class", 209], ["RU-RU - Economy Class", 410], ["RUC-RUC - Economy Class", 445], ["RUD-RUD - Economy Class", 421], ["RUG-R4 - Economy Class", 105], ["RUMRA-R- EBBUMRA", 245], ["RUO-RUO - Economy Class", 447], ["RUS-RUS - Economy Class", 433], ["RX-R5 - Economy Class", 123], ["RXX-R7 - Economy Class", 350], ["RXXX-R6 - Economy Class", 320], ["S-S - Economy Class", 84], ["S1-S1-Special Fare", 150], ["S2-S2-SPECIAL FARE", 151], ["S5-Economy Class", 256], ["s56-S -University Of Sudan", 432], ["S6-S - Economy Class (RT)", 311], ["S9-SD - Special", 316], ["SD-Discount", 297], ["SF-SF-JED", 308], ["SIET-S Interline", 397], ["SPECIAL-Special Fare", 129], ["SPEICAL-SPECAL FARE", 137], ["SS-S _ Economy Class", 153], ["STR-STR", 87], ["STR1-STR CHLD", 240], ["SUAE-S - ECOnomy Class", 340], ["T-T - Economy Class", 148], ["T2-T - Low Fare", 83], ["T47-Econ - T", 319], ["T48-Economy - T", 411], ["TA-T-Economy Class (RT)", 203], ["tes-CHARTER CLASS", 126], ["TIET-T Interline", 398], ["Tq-Tq-Eco Class", 183], ["TR-T - Economy  Class (RT)", 167], ["TR0-TR AS", 334], ["TRN-TRN-347", 428], ["TS-T - Special Economy Class", 333], ["TUMRA-T - Umrah Special", 156], ["U-Economy (U)", 29], ["UIET-U Interline", 399], ["UL-UL-MX", 260], ["umr-H - Umrah Individuals", 244], ["Umrah-F - Umrah (NDJ)", 239], ["uo-U - Umrah Group", 255], ["US1-USD - LOW FARE", 223], ["US2-U - SPECIAL FARE", 224], ["US3-USD - FULL FARE", 225], ["US5-USD - ECO CLASS (RT1)", 227], ["US6-USD - ECO CLASS (RT2)", 230], ["US7-USD - ECO CLASS (RT3)", 234], ["Uu-U - Economy Class", 289], ["Uw-W-Economy Class (NR)", 162], ["Uy-Y-Economy Class (NR)", 168], ["V-V-Eco Class", 43], ["V1-V1-CLASS", 140], ["v17-v-full fare", 353], ["V18-eco fare", 336], ["V2-V2-CLASS", 141], ["V3-V_Eco Class", 159], ["V4-V - Discount fare", 296], ["V5-DOH INAD", 298], ["V6-V - Low fare", 299], ["V7-V - Economy class", 300], ["VIET-V Interline", 400], ["VR-V - Eco Class (RT)", 233], ["VVV-ECO CLASS", 352], ["w-W - Economy Class", 149], ["W2-W_Eco Class", 133], ["WCHC-Wheelchair", 127], ["WCHU-WCHU - UMRA", 247], ["WIET-W Interline", 401], ["WKAPI-WK - (Y)", 454], ["WKAPIH-WK - (H)", 455], ["WU-W - Groups", 284], ["WW-W- Economy Class", 221], ["X-R-Economy  Class (RT)", 164], ["X1-X1-Eco Class", 207], ["XIET-X Interline", 402], ["Y-Y - Full Fare", 33], ["Y1-Y1- Full Fare", 124], ["Y3-Y-econmoy", 271], ["Y48-Economy-Y", 420], ["Y48N-Economy-YN", 419], ["Y6-Y- Economy Full fare", 259], ["Y8-Y - Economy Class", 301], ["Y9-Y - High Fare", 302], ["YC-YC", 45], ["YC2-YC2", 50], ["YF-Y-FREE", 104], ["YFUL-Y - Full Fare Plus", 312], ["YIET-Y Interline", 403], ["YM-Y - Umrah fare", 69], ["YPLUS-Y+Eco class", 92], ["YUAE-Y - Full Fare Economy Class", 342], ["yy-Y -  Economy class", 14], ["Z-Z-BUSINESSES CLASS", 188], ["ZBC-Z1 Business Class", 326], ["ZIET-Z Interline", 404], ["ZUAE-Z - Business Class Discounted", 344], ["ZW-ZW", 443], ["ZXX-ZXX - Economy Class", 303]], "leg": [["ADD-DOG", 372], ["ADD-CAI", 367], ["ADD-AHB", 361], ["ADD-MED", 329], ["ADD-DOH", 327], ["ADD-KWI", 321], ["ADD-DMM", 319], ["ADD-RUH", 309], ["ADD-JED", 307], ["ADD-ASM", 305], ["ADD-PZU", 301], ["ADD-KRT", 23], ["ADE-PZU", 257], ["ADE-JED", 201], ["ADE-DOH", 186], ["ADE-AMM", 96], ["ADE-KRT", 71], ["ADJ-KRT", 146], ["AHB-ADD", 362], ["AHB-KSL", 360], ["AHB-DOG", 357], ["AHB-KRT", 355], ["AHB-ASM", 332], ["AHB-EBB", 326], ["AHB-PZU", 324], ["AMM-PZU", 254], ["AMM-NDJ", 211], ["AMM-NBO", 209], ["AMM-EGN", 158], ["AMM-GXF", 101], ["AMM-ADE", 97], ["AMM-EBB", 64], ["AMM-KRT", 21], ["ASM-AHB", 331], ["ASM-ADD", 306], ["ASM-KSL", 280], ["ASM-PZU", 234], ["ASM-SHJ", 207], ["ASM-DXB", 200], ["ASM-NBO", 184], ["ASM-KWI", 180], ["ASM-NDJ", 166], ["ASM-DOH", 136], ["ASM-CAI", 94], ["ASM-JED", 82], ["ASM-RUH", 80], ["ASM-EBB", 58], ["ASM-JUB", 52], ["ASM-KRT", 50], ["ATH-CAI", 352], ["AUH-KWI", 342], ["AUH-JED", 336], ["BGF-KRT", 112], ["BGW-CAI", 346], ["CAI-ADD", 368], ["CAI-ATH", 351], ["CAI-BGW", 345], ["CAI-PVG", 343], ["CAI-CAN", 339], ["CAI-MRA", 337], ["CAI-IST", 317], ["CAI-SHJ", 299], ["CAI-KSL", 291], ["CAI-DOG", 286], ["CAI-DXB", 227], ["CAI-DMM", 225], ["CAI-KWI", 178], ["CAI-NBO", 175], ["CAI-AMM", 160], ["CAI-PZU", 142], ["CAI-DOH", 133], ["CAI-KAN", 120], ["CAI-RUH", 110], ["CAI-JED", 108], ["CAI-ASM", 95], ["CAI-EBB", 62], ["CAI-NDJ", 41], ["CAI-JUB", 37], ["CAI-KRT", 5], ["CAN-CAI", 340], ["DAM-RUH", 334], ["DIA-NDJ", 219], ["DIA-KRT", 203], ["DMM-ADD", 320], ["DMM-KSL", 314], ["DMM-DOG", 311], ["DMM-PZU", 248], ["DMM-CAI", 226], ["DMM-NBO", 224], ["DMM-EBB", 107], ["DMM-KRT", 35], ["DOG-ELQ", 378], ["DOG-ADD", 371], ["DOG-TUU", 369], ["DOG-AHB", 358], ["DOG-SHJ", 316], ["DOG-DMM", 312], ["DOG-MCT", 304], ["DOG-DOH", 297], ["DOG-KWI", 293], ["DOG-KSL", 289], ["DOG-CAI", 287], ["DOG-DXB", 271], ["DOG-JED", 269], ["DOG-RUH", 267], ["DOG-PZU", 265], ["DOG-MED", 192], ["DOG-KRT", 46], ["DOH-ADD", 328], ["DOH-DOG", 296], ["DOH-KSL", 283], ["DOH-ADE", 185], ["DOH-EBB", 176], ["DOH-UYL", 151], ["DOH-EGN", 150], ["DOH-ELF", 149], ["DOH-JED", 147], ["DOH-PZU", 144], ["DOH-ASM", 135], ["DOH-CAI", 134], ["DOH-NDJ", 132], ["DOH-KRT", 125], ["DXB-KWI", 380], ["DXB-CAI", 300], ["DXB-KSL", 275], ["DXB-DOG", 270], ["DXB-JED", 263], ["DXB-PZU", 230], ["DXB-KAN", 228], ["DXB-JUB", 221], ["DXB-EBB", 215], ["DXB-NBO", 206], ["DXB-ASM", 199], ["DXB-NDJ", 198], ["DXB-KRT", 187], ["EBB-AHB", 325], ["EBB-PZU", 243], ["EBB-NDJ", 218], ["EBB-DXB", 216], ["EBB-DOH", 177], ["EBB-DMM", 106], ["EBB-MED", 93], ["EBB-RUH", 75], ["EBB-AMM", 63], ["EBB-CAI", 61], ["EBB-JED", 59], ["EBB-ASM", 57], ["EBB-KRT", 56], ["EBB-JUB", 54], ["EGN-PZU", 194], ["EGN-ELF", 155], ["EGN-DOH", 153], ["EGN-KRT", 11], ["ELF-EGN", 156], ["ELF-DOH", 152], ["ELF-KRT", 15], ["ELQ-DOG", 377], ["ELQ-PZU", 376], ["ELQ-KRT", 138], ["GXF-AMM", 100], ["GXF-KRT", 99], ["HYD-MCT", 350], ["IST-CAI", 318], ["IST-KRT", 191], ["JED-SAW", 381], ["JED-JUB", 354], ["JED-AUH", 335], ["JED-ADD", 308], ["JED-KSL", 277], ["JED-DOG", 268], ["JED-DXB", 262], ["JED-PZU", 232], ["JED-ADE", 202], ["JED-NBO", 173], ["JED-DOH", 148], ["JED-BGF", 116], ["JED-CAI", 109], ["JED-ASM", 81], ["JED-KAN", 73], ["JED-EBB", 60], ["JED-NDJ", 29], ["JED-KRT", 25], ["JUB-JED", 353], ["JUB-KSL", 285], ["JUB-PZU", 261], ["JUB-DXB", 222], ["JUB-NBO", 171], ["JUB-WUU", 102], ["JUB-EBB", 53], ["JUB-ASM", 51], ["JUB-CAI", 36], ["JUB-KRT", 7], ["KAN-DXB", 229], ["KAN-CAI", 121], ["KAN-RUH", 91], ["KAN-MED", 88], ["KAN-JED", 74], ["KAN-KRT", 66], ["KDX-KRT", 19], ["KRT-TUU", 365], ["KRT-AHB", 356], ["KRT-DIA", 204], ["KRT-IST", 190], ["KRT-SHJ", 188], ["KRT-DXB", 182], ["KRT-NBO", 163], ["KRT-ADJ", 145], ["KRT-MCT", 139], ["KRT-ELQ", 137], ["KRT-DOH", 124], ["KRT-BGF", 113], ["KRT-WUU", 104], ["KRT-GXF", 98], ["KRT-MED", 86], ["KRT-ADE", 72], ["KRT-KWI", 70], ["KRT-KAN", 65], ["KRT-EBB", 55], ["KRT-ASM", 49], ["KRT-DOG", 48], ["KRT-RSS", 42], ["KRT-WHF", 38], ["KRT-DMM", 34], ["KRT-KSL", 32], ["KRT-MQX", 30], ["KRT-RUH", 26], ["KRT-JED", 24], ["KRT-ADD", 22], ["KRT-AMM", 20], ["KRT-KDX", 18], ["KRT-PZU", 16], ["KRT-ELF", 14], ["KRT-UYL", 12], ["KRT-EGN", 10], ["KRT-NDJ", 8], ["KRT-JUB", 6], ["KRT-CAI", 4], ["KSL-MCT", 373], ["KSL-AHB", 359], ["KSL-DMM", 313], ["KSL-KWI", 295], ["KSL-CAI", 290], ["KSL-DOG", 288], ["KSL-JUB", 284], ["KSL-DOH", 282], ["KSL-ASM", 281], ["KSL-RUH", 278], ["KSL-JED", 276], ["KSL-DXB", 274], ["KSL-PZU", 273], ["KSL-KRT", 33], ["KWI-DXB", 379], ["KWI-MCT", 347], ["KWI-AUH", 341], ["KWI-ADD", 322], ["KWI-KSL", 294], ["KWI-DOG", 292], ["KWI-PZU", 245], ["KWI-ASM", 181], ["KWI-CAI", 179], ["KWI-KRT", 67], ["MCT-KSL", 374], ["MCT-HYD", 349], ["MCT-KWI", 348], ["MCT-DOG", 303], ["MCT-PZU", 237], ["MCT-KRT", 140], ["MED-ADD", 330], ["MED-PZU", 239], ["MED-DOG", 193], ["MED-UYL", 118], ["MED-BGF", 115], ["MED-EBB", 92], ["MED-KAN", 89], ["MED-KRT", 87], ["MQX-KRT", 31], ["MRA-CAI", 338], ["NBO-DMM", 223], ["NBO-AMM", 210], ["NBO-DXB", 205], ["NBO-ASM", 183], ["NBO-CAI", 174], ["NBO-JED", 172], ["NBO-JUB", 170], ["NBO-RUH", 169], ["NBO-KRT", 164], ["NDJ-PZU", 252], ["NDJ-DIA", 220], ["NDJ-EBB", 217], ["NDJ-RUH", 213], ["NDJ-AMM", 212], ["NDJ-DXB", 196], ["NDJ-ASM", 165], ["NDJ-DOH", 131], ["NDJ-CAI", 40], ["NDJ-JED", 28], ["NDJ-KRT", 9], ["PVG-CAI", 344], ["PZU-ELQ", 375], ["PZU-TUU", 363], ["PZU-AHB", 323], ["PZU-ADD", 302], ["PZU-KSL", 272], ["PZU-DOG", 264], ["PZU-JUB", 260], ["PZU-UKR", 258], ["PZU-ADE", 256], ["PZU-AMM", 255], ["PZU-NDJ", 253], ["PZU-SHJ", 250], ["PZU-DMM", 249], ["PZU-RUH", 246], ["PZU-KWI", 244], ["PZU-EBB", 241], ["PZU-MED", 238], ["PZU-MCT", 236], ["PZU-ASM", 235], ["PZU-JED", 233], ["PZU-DXB", 231], ["PZU-EGN", 195], ["PZU-DOH", 143], ["PZU-CAI", 141], ["PZU-KRT", 17], ["RSS-KRT", 43], ["RUH-DAM", 333], ["RUH-ADD", 310], ["RUH-KSL", 279], ["RUH-DOG", 266], ["RUH-PZU", 247], ["RUH-NDJ", 214], ["RUH-NBO", 168], ["RUH-CAI", 111], ["RUH-KAN", 90], ["RUH-ASM", 79], ["RUH-EBB", 76], ["RUH-KRT", 27], ["SAW-JED", 382], ["SHJ-DOG", 315], ["SHJ-CAI", 298], ["SHJ-PZU", 251], ["SHJ-ASM", 208], ["SHJ-KRT", 189], ["TUU-DOG", 370], ["TUU-KRT", 366], ["TUU-PZU", 364], ["UKR-PZU", 259], ["UYL-DOH", 154], ["UYL-MED", 119], ["UYL-KRT", 13], ["WHF-DOG", 44], ["WHF-KRT", 39], ["WUU-KRT", 105], ["WUU-JUB", 103]], "pax": [["Adult(s)", 1], ["Child(ren)", 2], ["Infant(s)", 3], ["Live Animal", 14], ["Special Service", 5], ["Stretcher Case", 7], ["Wheel Chair Carry", 10], ["Wheel chair ramp", 6]], "ptype": [["Classic", 0], ["NoShow", 1]], "atype": [["By coupon", 0], ["By origin-destination", 1]], "ba": [["Before", 1], ["After", 2]], "cur": [["BHD", "BHD"], ["CAD", "CAD"], ["CZK", "CZK"], ["EGP", "EGP"], ["ERN", "ERN"], ["ETB", "ETB"], ["EUR", "EUR"], ["XAF", "XAF"], ["HKD", "HKD"], ["JOD", "JOD"], ["KES", "KES"], ["KWD", "KWD"], ["NGN", "NGN"], ["TRY", "TRY"], ["NOK", "NOK"], ["NUC", "NUC"], ["GBP", "GBP"], ["QAR", "QAR"], ["OMR", "OMR"], ["SAR", "SAR"], ["SSP", "SSP"], ["SDG", "SDG"], ["SEK", "SEK"], ["CHF", "CHF"], ["AED", "AED"], ["UGX", "UGX"], ["USD", "USD"], ["YER", "YER"]], "mode": [["Value", 0], ["Percentage", 1]]};
+const ENABLED_CURRENCIES = ['SDG','USD','AED','SAR','QAR','OMR','EGP'];   // add more codes from the reference list here
+const QUICK_FARES = [['S','S-S - Economy Class','Economy Class'],['H','H-H - High Fare','High Fare'],['Y','Y-Y - Full Fare','Full Fare'],['J','J-J - Business Class','Business Class']];
+const PAX_WITH_PENALTY = ['Adult(s)','Child(ren)'];
+const PAX_INFANT = 'Infant(s)';
+const FIXED = {action:'Update', ptype:'Classic', atype:'By coupon', from:0, to:10000};
+const BA_ORDER = ['Before','After'];
+
+const COLS = ['Action Type','AC','ID','Farebasis','FA','Leg','CP','Passenger Type','PA','Penalty Type','PT','Application Type','AT',
+  'Between(hours)','And(hours)','Before or After flight','BA','Currency','CU','Modification pen amount','Modification pen mode','AM',
+  'Refund pen amount','Refund pen mode','AM'];
+const GROUPS = [['action',0],['fare',3],['leg',6],['pax',9],['ptype',12],['atype',15],['ba',18],['cur',21],['mode',24]];
+const LOOKUP = {B:['A','action'],E:['D','fare'],G:['F','leg'],I:['H','pax'],K:['J','ptype'],M:['L','atype'],Q:['P','ba'],S:['R','cur'],V:['U','mode'],Y:['X','mode']};
+
+function colLetter(i){let s='';i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;}
+const CODE = {};
+for (const [k] of GROUPS) CODE[k] = new Map(REF[k].map(([l,c])=>[l,c]));
+
+function fmtAmt(a){return Number.isInteger(a)?String(a):String(+a.toFixed(4));}
+
+/* pen: {Before:{mod:{amt,mode},ref:{amt,mode}}, After:{...}} */
+function ruleRows(rule){
+  const out=[];
+  for (const ba of BA_ORDER){
+    const p = rule.pen[ba];
+    const paxList = rule.infant ? PAX_WITH_PENALTY.concat([PAX_INFANT]) : PAX_WITH_PENALTY;
+    for (const fare of rule.fares) for (const leg of rule.legs) for (const pax of paxList){
+      const zero = pax===PAX_INFANT;
+      out.push({fare,leg,pax,ba,cur:rule.cur,
+        modAmt: zero?0:p.mod.amt, modMode: zero?'Value':p.mod.mode,
+        refAmt: zero?0:p.ref.amt, refMode: zero?'Value':p.ref.mode});
+    }
+  }
+  return out;
+}
+/* If the same (Farebasis, Leg, Passenger, Before/After) repeats, the later rule replaces the earlier one in place */
+function generateRows(batch,startId){
+  const map=new Map(); let overridden=0;
+  for (const rule of batch) for (const r of ruleRows(rule)){
+    const key=[r.fare,r.leg,r.pax,r.ba].join('|');
+    if (map.has(key)) overridden++;
+    map.set(key,r);
+  }
+  const rows=[...map.values()];
+  rows.forEach((r,i)=>{r.id=startId+i;});
+  return {rows,overridden};
+}
+function rowCells(r,n){
+  const v={A:FIXED.action,C:r.id,D:r.fare,F:r.leg,H:r.pax,J:FIXED.ptype,L:FIXED.atype,N:FIXED.from,O:FIXED.to,
+    P:r.ba,R:r.cur,T:r.modAmt,U:r.modMode,W:r.refAmt,X:r.refMode};
+  const cells={};
+  for (const L in v) cells[L]={t:typeof v[L]==='number'?'n':'s',v:v[L]};
+  for (const L in LOOKUP){
+    const [src,g]=LOOKUP[L]; const code=CODE[g].get(v[src]);
+    const lo=colLetter(GROUPS.find(x=>x[0]===g)[1]), hi=colLetter(GROUPS.find(x=>x[0]===g)[1]+1);
+    const f=`IFERROR(VLOOKUP(${src}${n},ReferenceValues!$${lo}$2:$${hi}$${REF[g].length+1},2,0),"")`;
+    cells[L]={t:typeof code==='number'?'n':'s',v:code===undefined?'':code,f};
+  }
+  return cells;
+}
+function buildWorkbook(rows){
+  const ws={}; COLS.forEach((h,i)=>{ws[colLetter(i)+'1']={t:'s',v:h};});
+  rows.forEach((r,i)=>{const n=i+2,c=rowCells(r,n);for(const L in c)ws[L+n]=c[L];});
+  ws['!ref']='A1:Y'+(rows.length+1);
+  ws['!cols']=COLS.map((h,i)=>({wch:[3,8,9,10,13,14,15,24].includes(i)?22:Math.max(10,h.length+2)}));
+  const rf={}; let maxLen=0;
+  for (const [k,c0] of GROUPS){
+    rf[colLetter(c0)+'1']={t:'s',v:'Label'}; rf[colLetter(c0+1)+'1']={t:'s',v:'Code'};
+    REF[k].forEach(([l,c],i)=>{
+      rf[colLetter(c0)+(i+2)]={t:'s',v:l};
+      rf[colLetter(c0+1)+(i+2)]={t:typeof c==='number'?'n':'s',v:c};
+    });
+    maxLen=Math.max(maxLen,REF[k].length);
+  }
+  rf['!ref']='A1:Z'+(maxLen+1);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Penalties');
+  XLSX.utils.book_append_sheet(wb,rf,'ReferenceValues');
+  return wb;
+}
+function toXlsxBuffer(rows){return XLSX.write(buildWorkbook(rows),{bookType:'xlsx',type:'array'});}
+
+/* ===== Validation ===== */
+function parseAmt(s){
+  s=String(s).trim().replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace('٫','.').replace(',','.');
+  if(s==='')return null; const n=Number(s); return Number.isFinite(n)&&n>=0?n:NaN;
+}
+function amtError(raw,mode){
+  const n=parseAmt(raw);
+  if(n===null) return 'Required';
+  if(Number.isNaN(n)) return 'Invalid number';
+  if(mode==='Percentage'&&n>100) return 'Percentage is over 100';
+  return '';
+}
+</script>
+
+<script>
+/* ===== UI ===== */
+const $=id=>document.getElementById(id);
+const plural=n=>n+(n===1?' row':' rows');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KEY='penalties-builder-v1';
+
+const state={
+  fares:new Set(['S-S - Economy Class']),
+  legs:new Set(['PZU-JED']),
+  pen:{Before:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
+       After:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}}},
+  cur:'USD', infant:false, startId:'1', batch:[]
+};
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(!s)return;
+    if(Array.isArray(s.fares))state.fares=new Set(s.fares.filter(x=>CODE.fare.has(x)));
+    if(Array.isArray(s.legs))state.legs=new Set(s.legs.filter(x=>CODE.leg.has(x)));
+    if(s.pen&&s.pen.Before&&s.pen.After)state.pen=s.pen;
+    if(ENABLED_CURRENCIES.includes(s.cur))state.cur=s.cur;
+    state.infant=!!s.infant; if(s.startId)state.startId=String(s.startId);
+    if(Array.isArray(s.batch))state.batch=s.batch;
+  }catch(e){}
+}
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify({fares:[...state.fares],legs:[...state.legs],pen:state.pen,cur:state.cur,
+    infant:state.infant,startId:state.startId,batch:state.batch}));}catch(e){}
+}
+
+/* --- Picker (search + multi-select) --- */
+function makePicker(root,items,set,placeholder,onChange){
+  root.innerHTML=`<input type="search" class="latin" placeholder="${placeholder}" aria-label="${placeholder}" dir="ltr">
+    <div class="pick-tools"><button type="button" data-a="all">Select all shown</button><button type="button" data-a="none">Clear selection</button><span class="count"></span></div>
+    <div class="pick-list" role="group"></div><div class="chips"></div>`;
+  const q=root.querySelector('input'),list=root.querySelector('.pick-list'),chips=root.querySelector('.chips'),cnt=root.querySelector('.count');
+  let shown=items;
+  function drawChips(){
+    chips.innerHTML=[...set].map(l=>`<span class="chip"><span class="latin">${esc(l)}</span><button type="button" data-rm="${esc(l)}" aria-label="Remove ${esc(l)}">×</button></span>`).join('');
+    cnt.textContent=`${set.size} selected of ${items.length}`;
+  }
+  function drawList(){
+    const t=q.value.trim().toLowerCase();
+    shown=t?items.filter(l=>l.toLowerCase().includes(t)):items;
+    list.innerHTML=shown.length?shown.map(l=>`<label class="pick-row"><input type="checkbox" value="${esc(l)}"${set.has(l)?' checked':''}><span class="latin">${esc(l)}</span></label>`).join('')
+      :'<div class="empty-note">No matches.</div>';
+  }
+  q.addEventListener('input',drawList);
+  list.addEventListener('change',e=>{const c=e.target;if(c.type!=='checkbox')return;c.checked?set.add(c.value):set.delete(c.value);drawChips();onChange();});
+  chips.addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;set.delete(b.dataset.rm);drawList();drawChips();onChange();});
+  root.querySelector('.pick-tools').addEventListener('click',e=>{
+    const a=e.target.dataset.a;if(!a)return;
+    if(a==='all')shown.forEach(l=>set.add(l));else set.clear();
+    drawList();drawChips();onChange();
+  });
+  drawList();drawChips();
+  return {redraw(){drawList();drawChips();}};
+}
+
+/* --- Penalty form --- */
+function modeOpts(sel){return REF.mode.map(([l])=>`<option value="${l}"${l===sel?' selected':''}>${l==='Value'?'Value (amount)':'Percentage (%)'}</option>`).join('');}
+function drawPen(ba){
+  const p=state.pen[ba],box=$('box-'+ba);
+  box.innerHTML=`<h3><span class="tag ${ba==='After'?'after':''} latin">${ba}</span>flight${ba==='After'?'<button class="link" type="button" data-copy>Copy from Before</button>':''}</h3>
+    ${['mod','ref'].map(k=>`<label class="lbl ${k}" for="${ba}-${k}-amt">${k==='mod'?'Modification':'Refund'}</label>
+      <div class="f-row"><input class="num ${k}" id="${ba}-${k}-amt" type="text" inputmode="decimal" autocomplete="off" value="${esc(p[k].amt)}" data-ba="${ba}" data-k="${k}">
+      <select id="${ba}-${k}-mode" aria-label="Type" data-ba="${ba}" data-k="${k}">${modeOpts(p[k].mode)}</select></div>
+      <div class="err" id="${ba}-${k}-err"></div>`).join('')}`;
+}
+function wirePen(){
+  document.querySelectorAll('.pen-box').forEach(box=>{
+    box.addEventListener('input',e=>{const t=e.target;if(t.dataset.k&&t.tagName==='INPUT'){state.pen[t.dataset.ba][t.dataset.k].amt=t.value;refresh();}});
+    box.addEventListener('change',e=>{const t=e.target;if(t.dataset.k&&t.tagName==='SELECT'){state.pen[t.dataset.ba][t.dataset.k].mode=t.value;refresh();}});
+    box.addEventListener('click',e=>{if(e.target.dataset.copy!==undefined){state.pen.After=JSON.parse(JSON.stringify(state.pen.Before));drawPen('After');refresh();}});
+  });
+}
+
+/* --- Draft / validation --- */
+function penErrors(){
+  const errs={};
+  for(const ba of BA_ORDER)for(const k of ['mod','ref']){
+    const p=state.pen[ba][k]; errs[ba+'-'+k]=amtError(p.amt,p.mode);
+  }
+  return errs;
+}
+function draftRule(){
+  const num=x=>({amt:parseAmt(x.amt),mode:x.mode});
+  const pen={};for(const ba of BA_ORDER)pen[ba]={mod:num(state.pen[ba].mod),ref:num(state.pen[ba].ref)};
+  return {fares:[...state.fares],legs:[...state.legs],pen,cur:state.cur,infant:state.infant};
+}
+function draftProblems(){
+  const out=[]; if(!state.fares.size)out.push('Select a fare class'); if(!state.legs.size)out.push('Select at least one leg');
+  if(Object.values(penErrors()).some(Boolean))out.push('Fix the penalty values'); return out;
+}
+function startId(){return 1;}  // IDs are generated automatically from 1
+function fmtPen(amt,mode,cur){return mode==='Percentage'?fmtAmt(amt)+'%':fmtAmt(amt)+' '+cur;}
+
+function drawPreview(){
+  const probs=draftProblems(),t=$('prev-table');
+  const errs=penErrors();
+  for(const k in errs){const e=$(k+'-err'),i=$(k.replace(/-(mod|ref)$/,'-$1-amt'));if(e)e.textContent=errs[k];if(i)i.classList.toggle('bad',!!errs[k]);}
+  if(probs.length){
+    t.innerHTML='<tbody><tr><td class="empty-note" style="white-space:normal">'+esc(probs.join(' · '))+'</td></tr></tbody>';
+    $('prev-count').textContent=''; $('btn-add').disabled=true; $('why').textContent=probs.join(' · '); return;
+  }
+  const rule=draftRule(),rows=ruleRows(rule),show=rows.slice(0,12);
+  t.innerHTML='<thead><tr><th class="latin">Farebasis</th><th class="latin">Leg</th><th>Passenger</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th></tr></thead><tbody>'+
+    show.map(r=>`<tr><td class="latin">${esc(r.fare)}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(r.pax)}</td>
+      <td><span class="tag ${r.ba==='After'?'after':''} latin">${r.ba}</span></td>
+      <td class="latin v-mod">${fmtPen(r.modAmt,r.modMode,r.cur)}</td><td class="latin v-ref">${fmtPen(r.refAmt,r.refMode,r.cur)}</td></tr>`).join('')+'</tbody>';
+  $('prev-count').textContent=rows.length>show.length?`First ${show.length} of ${rows.length} rows`:plural(rows.length);
+  $('btn-add').disabled=false; $('btn-add').textContent=`Add ${plural(rows.length)} to file`;
+  $('why').textContent='';
+}
+
+/* --- Batch --- */
+function drawBatch(){
+  const {rows,overridden}=generateRows(state.batch.map(b=>b.rule),startId());
+  $('tot-rows').textContent=rows.length; $('tot-rules').textContent=state.batch.length;
+  $('batch-list').innerHTML=state.batch.length?state.batch.map((b,i)=>{
+    const r=b.rule,n=ruleRows(r).length,bf=r.pen.Before,af=r.pen.After;
+    return `<li class="batch-item"><div class="meta"><b>${r.fares.length} class × ${r.legs.length} leg</b> · ${plural(n)}
+      <div class="sub2 latin">${esc(r.fares.slice(0,2).join(', '))}${r.fares.length>2?' +'+(r.fares.length-2):''}</div>
+      <div class="sub2 latin">${esc(r.legs.slice(0,4).join(', '))}${r.legs.length>4?' +'+(r.legs.length-4):''}</div>
+      <div class="sub2 latin">Before <span class="v-mod">${fmtPen(bf.mod.amt,bf.mod.mode,r.cur)}</span> / <span class="v-ref">${fmtPen(bf.ref.amt,bf.ref.mode,r.cur)}</span> · After <span class="v-mod">${fmtPen(af.mod.amt,af.mod.mode,r.cur)}</span> / <span class="v-ref">${fmtPen(af.ref.amt,af.ref.mode,r.cur)}</span></div></div>
+      <button class="link" type="button" data-del="${i}" aria-label="Delete group">Delete</button></li>`;}).join('')
+    :'<li class="empty-note" style="padding:6px 0">Empty</li>';
+  $('btn-export').disabled=!rows.length;
+  const st=$('status');
+  if(overridden){st.className='status warn';st.textContent=`${overridden} duplicate ${overridden===1?'row':'rows'}: the latest replaced the earlier one.`;}
+  else if(rows.length>5000){st.className='status warn';st.textContent='The original template is sized for 5,000 rows; this file has '+rows.length+'.';}
+  else if(!st.dataset.keep){st.className='status';st.textContent='';}
+}
+
+function drawQuick(){
+  const q=$('fare-quick'),all=QUICK_FARES.every(([,l])=>state.fares.has(l));
+  q.innerHTML=QUICK_FARES.map(([k,l,n])=>
+    `<button type="button" data-fare="${esc(l)}" aria-pressed="${state.fares.has(l)}" title="${esc(l)}"><b>${k}</b><span class="latin">${esc(n)}</span></button>`).join('')+
+    `<button type="button" class="all" data-fare="*all" aria-pressed="${all}">Select all</button>`;
+}
+function refresh(){drawQuick();drawPreview();drawBatch();save();}
+function say(cls,txt){const s=$('status');s.className='status '+cls;s.textContent=txt;s.dataset.keep='1';setTimeout(()=>{delete s.dataset.keep;},4000);}
+
+/* --- Wire up --- */
+load();
+const farePicker=makePicker($('fare-picker'),REF.fare.map(x=>x[0]),state.fares,'Search Farebasis',refresh);
+const legPicker=makePicker($('leg-picker'),REF.leg.map(x=>x[0]),state.legs,'Search Leg, e.g. JED',refresh);
+$('fare-quick').addEventListener('click',e=>{
+  const b=e.target.closest('[data-fare]');if(!b)return;
+  const v=b.dataset.fare;
+  if(v==='*all'){const all=QUICK_FARES.every(([,l])=>state.fares.has(l));QUICK_FARES.forEach(([,l])=>all?state.fares.delete(l):state.fares.add(l));}
+  else state.fares.has(v)?state.fares.delete(v):state.fares.add(v);
+  farePicker.redraw();refresh();
+});
+drawPen('Before');drawPen('After');wirePen();
+if([...state.fares].some(l=>!QUICK_FARES.some(q=>q[1]===l)))$('fare-more').open=true;
+$('cur').innerHTML=ENABLED_CURRENCIES.map(c=>`<option value="${c}"${c===state.cur?' selected':''}>${c}</option>`).join('');
+$('cur').addEventListener('change',e=>{state.cur=e.target.value;refresh();});
+$('infant').checked=state.infant;
+$('infant').addEventListener('change',e=>{state.infant=e.target.checked;refresh();});
+
+$('btn-add').addEventListener('click',()=>{
+  if(draftProblems().length)return;
+  const rule=draftRule(); state.batch.push({rule}); refresh();
+  say('ok',`Added ${plural(ruleRows(rule).length)} to the file.`);
+});
+$('batch-list').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;state.batch.splice(+b.dataset.del,1);refresh();});
+$('btn-clear').addEventListener('click',()=>{if(!state.batch.length)return;state.batch=[];refresh();say('ok','File cleared.');});
+
+$('btn-export').addEventListener('click',async()=>{
+  const {rows}=generateRows(state.batch.map(b=>b.rule),startId()); if(!rows.length)return;
+  let dl=null; try{dl=window.claude?await claude.use('downloads'):null;}catch(e){}
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  const name=`Penalties_Export_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}.xlsx`;
+  if(!dl){  // standalone hosting (e.g. GitHub Pages): plain browser download
+    try{
+      const url=URL.createObjectURL(new Blob([toXlsxBuffer(rows)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),4000);
+      say('ok',`Saved ${name} (${plural(rows.length)}).`);
+    }catch(err){say('bad','Could not save the file: '+(err&&err.message?err.message:'Unknown error'));}
+    return;
+  }
+  try{
+    await dl.save({filename:name,data:toXlsxBuffer(rows)});
+    say('ok',`Saved ${name} (${plural(rows.length)}).`);
+  }catch(err){
+    if(err&&err.code==='declined')say('warn','Save cancelled.');
+    else say('bad','Could not save the file: '+(err&&err.message?err.message:'Unknown error'));
+  }
+});
+refresh();
+</script>
+
+</body>
+</html>
