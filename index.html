@@ -382,7 +382,7 @@ const state={
   pen:{Before:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
        After:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
        NoShow:blankPen()},
-  cur:'USD', startId:'1', batch:[], noshowOn:false, existing:new Map(), existingName:''
+  cur:'USD', startId:'1', batch:[], noshowOn:false, existing:new Map(), existingName:'', imported:false
 };
 function load(){
   try{
@@ -397,7 +397,7 @@ function load(){
 }
 function ensureNoShow(){if(!state.pen.NoShow)state.pen.NoShow=blankPen();}
 const EX_KEY='penalties-existing-v3';
-function loadExisting(){try{const o=JSON.parse(localStorage.getItem(EX_KEY)||'null');if(o&&Array.isArray(o.pairs)){state.existing=new Map(o.pairs.map(([k,v])=>[k,{id:v[0],modAmt:v[1],modMode:v[2],refAmt:v[3],refMode:v[4]}]));state.existingName=o.name||'';}}catch(e){}}
+function loadExisting(){try{const o=JSON.parse(localStorage.getItem(EX_KEY)||'null');if(o&&Array.isArray(o.pairs)){state.imported=true;state.existing=new Map(o.pairs.map(([k,v])=>[k,{id:v[0],modAmt:v[1],modMode:v[2],refAmt:v[3],refMode:v[4]}]));state.existingName=o.name||'';}}catch(e){}}
 function saveExisting(){try{if(state.existing.size)localStorage.setItem(EX_KEY,JSON.stringify({name:state.existingName,pairs:[...state.existing].map(([k,v])=>[k,[v.id,v.modAmt,v.modMode,v.refAmt,v.refMode]])}));else localStorage.removeItem(EX_KEY);}catch(e){}}
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify({fares:[...state.fares],legs:[...state.legs],pen:state.pen,cur:state.cur,
@@ -536,13 +536,23 @@ function drawExisting(){
   const n=state.existing.size,st=$('ex-status');
   st.className='ex-s '+(n?'good':'warn');
   st.textContent=n?`${n} penalties loaded${state.existingName?' from '+state.existingName:''}`:'Not imported: every row will be Add.';
-  $('ex-clear').hidden=!n;
+  $('ex-clear').hidden=!(n&&state.imported);
 }
 function refresh(){drawExisting();drawQuick();drawPreview();drawBatch();save();}
 function say(cls,txt){const s=$('status');s.className='status '+cls;s.textContent=txt;s.dataset.keep='1';setTimeout(()=>{delete s.dataset.keep;},4000);}
 
 /* --- Wire up --- */
 load();ensureNoShow();loadExisting();
+/* Built-in penalties (ID table): data/penalties.json next to the page. An imported file overrides it. */
+async function loadBuiltin(){
+  if(state.imported&&state.existing.size)return;
+  try{
+    const r=await fetch('data/penalties.json',{cache:'no-store'}); if(!r.ok)return;
+    const o=await r.json();
+    state.existing=new Map(o.rows.map(([pt,fa,lg,px,ba,fr,to,cu,id,ma,mm,ra,rm])=>[rowKey(pt,fa,lg,px,FIXED.atype,ba,fr,to,cu),{id,modAmt:ma,modMode:mm,refAmt:ra,refMode:rm}]));
+    state.existingName=(o.name||'data')+' (built-in)'; state.imported=false; refresh();
+  }catch(e){}
+}
 const farePicker=makePicker($('fare-picker'),REF.fare.map(x=>x[0]),state.fares,'Search Farebasis',refresh);
 const legPicker=makePicker($('leg-picker'),REF.leg.map(x=>x[0]),state.legs,'Search Leg, e.g. JED',refresh);
 $('fare-quick').addEventListener('click',e=>{
@@ -569,11 +579,11 @@ $('ex-file').addEventListener('change',async e=>{
   try{
     const {map,count}=parseExisting(await f.arrayBuffer());
     if(!map.size){say('bad','No penalty rows with IDs found in that file.');}
-    else{state.existing=map;state.existingName=f.name;saveExisting();refresh();say('ok',`Loaded ${count} existing penalties.`);}
+    else{state.existing=map;state.existingName=f.name;state.imported=true;saveExisting();refresh();say('ok',`Loaded ${count} existing penalties.`);}
   }catch(err){say('bad','Could not read the file: '+(err&&err.message?err.message:'Unknown error'));}
   e.target.value='';
 });
-$('ex-clear').addEventListener('click',()=>{state.existing=new Map();state.existingName='';saveExisting();refresh();});
+$('ex-clear').addEventListener('click',()=>{state.existing=new Map();state.existingName='';state.imported=false;saveExisting();refresh();loadBuiltin();});
 $('btn-clear').addEventListener('click',()=>{if(!state.batch.length)return;state.batch=[];refresh();say('ok','File cleared.');});
 
 $('btn-export').addEventListener('click',async()=>{
@@ -598,7 +608,7 @@ $('btn-export').addEventListener('click',async()=>{
     else say('bad','Could not save the file: '+(err&&err.message?err.message:'Unknown error'));
   }
 });
-refresh();
+refresh();loadBuiltin();
 </script>
 
 </body>
