@@ -173,7 +173,6 @@ details.more[open]>summary{margin-bottom:6px}
           <div class="pen-box" id="box-After"></div>
         </div>
         <div class="pen-box noshow-box" id="box-NoShow"></div>
-        <label class="chk" for="infant"><input type="checkbox" id="infant"> Include Infant rows with zero penalty</label>
       </section>
 
       <div class="pair">
@@ -221,7 +220,6 @@ const REF = {"action": [["Add", 1], ["Update", 2], ["Delete", 3]], "fare": [["12
 const ENABLED_CURRENCIES = ['SDG','USD','AED','SAR','QAR','OMR','EGP'];   // add more codes from the reference list here
 const QUICK_FARES = [['S','S-S - Economy Class','Economy Class'],['H','H-H - High Fare','High Fare'],['Y','Y-Y - Full Fare','Full Fare'],['J','J-J - Business Class','Business Class']];
 const PAX_WITH_PENALTY = ['Adult(s)','Child(ren)'];
-const PAX_INFANT = 'Infant(s)';
 const FIXED = {action:'Update', atype:'By coupon', from:0, to:10000};
 const BA_ORDER = ['Before','After'];
 
@@ -240,16 +238,15 @@ function fmtAmt(a){return Number.isInteger(a)?String(a):String(+a.toFixed(4));}
 /* pen: {Before:{mod:{amt,mode},ref:{amt,mode}}, After:{...}} */
 function ruleRows(rule){
   const out=[];
-  const paxList = rule.infant ? PAX_WITH_PENALTY.concat([PAX_INFANT]) : PAX_WITH_PENALTY;
+  const paxList = PAX_WITH_PENALTY;   // Adult and Child only; Infant gets no penalty rows
   const sets=[['Classic',ba=>rule.pen[ba]]];
   if (rule.noshow) sets.push(['NoShow',()=>rule.noshow]);   // NoShow: same values for Before and After
   for (const [ptype,get] of sets) for (const ba of BA_ORDER){
     const p = get(ba);
     for (const fare of rule.fares) for (const leg of rule.legs) for (const pax of paxList){
-      const zero = pax===PAX_INFANT;
       out.push({ptype,fare,leg,pax,ba,cur:rule.cur,
-        modAmt: zero?0:p.mod.amt, modMode: zero?'Value':p.mod.mode,
-        refAmt: zero?0:p.ref.amt, refMode: zero?'Value':p.ref.mode});
+        modAmt: p.mod.amt, modMode: p.mod.mode,
+        refAmt: p.ref.amt, refMode: p.ref.mode});
     }
   }
   return out;
@@ -329,7 +326,7 @@ const state={
   pen:{Before:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
        After:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
        NoShow:blankPen()},
-  cur:'USD', infant:false, startId:'1', batch:[], noshowOn:false
+  cur:'USD', startId:'1', batch:[], noshowOn:false
 };
 function load(){
   try{
@@ -338,14 +335,14 @@ function load(){
     if(Array.isArray(s.legs))state.legs=new Set(s.legs.filter(x=>CODE.leg.has(x)));
     if(s.pen&&s.pen.Before&&s.pen.After)state.pen=s.pen;
     if(ENABLED_CURRENCIES.includes(s.cur))state.cur=s.cur;
-    state.noshowOn=!!s.noshowOn; state.infant=!!s.infant; if(s.startId)state.startId=String(s.startId);
+    state.noshowOn=!!s.noshowOn; if(s.startId)state.startId=String(s.startId);
     if(Array.isArray(s.batch))state.batch=s.batch;
   }catch(e){}
 }
 function ensureNoShow(){if(!state.pen.NoShow)state.pen.NoShow=blankPen();}
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify({fares:[...state.fares],legs:[...state.legs],pen:state.pen,cur:state.cur,
-    infant:state.infant,noshowOn:state.noshowOn,startId:state.startId,batch:state.batch}));}catch(e){}
+    noshowOn:state.noshowOn,startId:state.startId,batch:state.batch}));}catch(e){}
 }
 
 /* --- Picker (search + multi-select) --- */
@@ -421,7 +418,7 @@ function draftRule(){
   const num=x=>({amt:parseAmt(x.amt),mode:x.mode});
   const pen={};for(const ba of BA_ORDER)pen[ba]={mod:num(state.pen[ba].mod),ref:num(state.pen[ba].ref)};
   const noshow=state.noshowOn?{mod:num(state.pen.NoShow.mod),ref:num(state.pen.NoShow.ref)}:null;
-  return {fares:[...state.fares],legs:[...state.legs],pen,noshow,cur:state.cur,infant:state.infant};
+  return {fares:[...state.fares],legs:[...state.legs],pen,noshow,cur:state.cur};
 }
 function draftProblems(){
   const out=[]; if(!state.fares.size)out.push('Select a fare class'); if(!state.legs.size)out.push('Select at least one leg');
@@ -492,8 +489,6 @@ drawPen('Before');drawPen('After');drawPen('NoShow');wirePen();
 if([...state.fares].some(l=>!QUICK_FARES.some(q=>q[1]===l)))$('fare-more').open=true;
 $('cur').innerHTML=ENABLED_CURRENCIES.map(c=>`<option value="${c}"${c===state.cur?' selected':''}>${c}</option>`).join('');
 $('cur').addEventListener('change',e=>{state.cur=e.target.value;refresh();});
-$('infant').checked=state.infant;
-$('infant').addEventListener('change',e=>{state.infant=e.target.checked;refresh();});
 
 $('btn-add').addEventListener('click',()=>{
   if(draftProblems().length)return;
