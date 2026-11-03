@@ -6,9 +6,9 @@ A static web page that builds the airline **Penalties Export** Excel file in the
 2. Pick one or more fare classes and one or more legs.
 3. Add them to the file, then export `.xlsx` (sheets: `Penalties` and `ReferenceValues`, with the same VLOOKUP code columns).
 
-Fixed values: Penalty Type `Classic`, Application Type `By coupon`, period 0 to 10000 hours. Adult and Child get the same penalty; Infant rows are optional (zero penalty).
+Fixed values: Penalty Type `Classic`, Application Type `By coupon`, Classic rows cover 0 to 10000 hours (Before and After). NoShow rows are Before only, 0 to 0 hours, like the real export. Adult and Child get the same penalty; Infant rows are optional (zero penalty).
 
-Action and ID: import an existing export file (the Penalties sheet with IDs). A row that matches an existing penalty (Penalty Type, Farebasis, Leg, Passenger, Before/After, hours) becomes `Update` with its ID. Any other row becomes `Add` with no ID.
+Action and ID: import an existing export file (the Penalties sheet with IDs). A row that matches an existing penalty (Penalty Type, Farebasis, Leg, Passenger, Before/After, hours, Currency) becomes `Update` with its ID. Any other row becomes `Add` with no ID.
 
 No build step and no backend: open `index.html` or host it on GitHub Pages. Reference codes are embedded in the page; currencies are set in `ENABLED_CURRENCIES`.
 

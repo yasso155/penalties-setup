@@ -235,7 +235,7 @@ const REF = {"action": [["Add", 1], ["Update", 2], ["Delete", 3]], "fare": [["12
 const ENABLED_CURRENCIES = ['SDG','USD','AED','SAR','QAR','OMR','EGP'];   // add more codes from the reference list here
 const QUICK_FARES = [['S','S-S - Economy Class','Economy Class'],['H','H-H - High Fare','High Fare'],['Y','Y-Y - Full Fare','Full Fare'],['J','J-J - Business Class','Business Class']];
 const PAX_WITH_PENALTY = ['Adult(s)','Child(ren)'];
-const FIXED = {action:'Update', atype:'By coupon', from:0, to:10000};
+const FIXED = {atype:'By coupon'};
 const BA_ORDER = ['Before','After'];
 
 const COLS = ['Action Type','AC','ID','Farebasis','FA','Leg','CP','Passenger Type','PA','Penalty Type','PT','Application Type','AT',
@@ -253,28 +253,27 @@ function fmtAmt(a){return Number.isInteger(a)?String(a):String(+a.toFixed(4));}
 /* pen: {Before:{mod:{amt,mode},ref:{amt,mode}}, After:{...}} */
 function ruleRows(rule){
   const out=[];
-  const paxList = PAX_WITH_PENALTY;   // Adult and Child only; Infant gets no penalty rows
-  const sets=[['Classic',ba=>rule.pen[ba]]];
-  if (rule.noshow) sets.push(['NoShow',()=>rule.noshow]);   // NoShow: same values for Before and After
-  for (const [ptype,get] of sets) for (const ba of BA_ORDER){
-    const p = get(ba);
-    for (const fare of rule.fares) for (const leg of rule.legs) for (const pax of paxList){
-      out.push({ptype,fare,leg,pax,ba,cur:rule.cur,
-        modAmt: p.mod.amt, modMode: p.mod.mode,
-        refAmt: p.ref.amt, refMode: p.ref.mode});
+  // Classic: Before and After, 0 to 10000 hours. NoShow: Before only, 0 to 0 hours (matches the real export).
+  const sets=[{ptype:'Classic',bas:BA_ORDER,from:0,to:10000,get:ba=>rule.pen[ba]}];
+  if (rule.noshow) sets.push({ptype:'NoShow',bas:['Before'],from:0,to:0,get:()=>rule.noshow});
+  for (const st of sets) for (const ba of st.bas){
+    const p = st.get(ba);
+    for (const fare of rule.fares) for (const leg of rule.legs) for (const pax of PAX_WITH_PENALTY){
+      out.push({ptype:st.ptype,from:st.from,to:st.to,fare,leg,pax,ba,cur:rule.cur,
+        modAmt:p.mod.amt,modMode:p.mod.mode,refAmt:p.ref.amt,refMode:p.ref.mode});
     }
   }
   return out;
 }
-/* If the same (Penalty Type, Farebasis, Leg, Passenger, Before/After) repeats, the later rule replaces the earlier one in place */
+/* If the same (Penalty Type, Farebasis, Leg, Passenger, Before/After, Currency) repeats, the later rule replaces the earlier one in place */
 /* Penalty identity: the same key means the same penalty in the booking system */
-function rowKey(ptype,fare,leg,pax,atype,ba,from,to){
-  return [ptype,fare,leg,pax,atype,ba,Number(from),Number(to)].map(x=>String(x).trim()).join('|');
+function rowKey(ptype,fare,leg,pax,atype,ba,from,to,cur){
+  return [ptype,fare,leg,pax,atype,ba,Number(from),Number(to),cur].map(x=>String(x).trim()).join('|');
 }
 /* Existing penalty (found by key) => Update with its ID. Not found => Add, no ID. */
 function annotate(rows,existing){
   for (const r of rows){
-    const id=existing?existing.get(rowKey(r.ptype,r.fare,r.leg,r.pax,FIXED.atype,r.ba,FIXED.from,FIXED.to)):undefined;
+    const id=existing?existing.get(rowKey(r.ptype,r.fare,r.leg,r.pax,FIXED.atype,r.ba,r.from,r.to,r.cur)):undefined;
     if (id!==undefined){r.action='Update';r.id=id;} else {r.action='Add';r.id=undefined;}
   }
   return rows;
@@ -282,7 +281,7 @@ function annotate(rows,existing){
 function generateRows(batch,existing){
   const map=new Map(); let overridden=0;
   for (const rule of batch) for (const r of ruleRows(rule)){
-    const key=[r.ptype,r.fare,r.leg,r.pax,r.ba].join('|');
+    const key=[r.ptype,r.fare,r.leg,r.pax,r.ba,r.cur].join('|');
     if (map.has(key)) overridden++;
     map.set(key,r);
   }
@@ -297,21 +296,21 @@ function parseExisting(buf){
   const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   const h=(data[0]||[]).map(x=>x==null?'':String(x).trim());
   const ix=n=>h.indexOf(n);
-  const need=['ID','Farebasis','Leg','Passenger Type','Penalty Type','Application Type','Between(hours)','And(hours)','Before or After flight'];
+  const need=['ID','Farebasis','Leg','Passenger Type','Penalty Type','Application Type','Between(hours)','And(hours)','Before or After flight','Currency'];
   const miss=need.filter(n=>ix(n)<0);
   if (miss.length) throw new Error('Missing columns: '+miss.join(', '));
   const map=new Map(); let count=0;
   for (let i=1;i<data.length;i++){
     const r=data[i],id=r[ix('ID')];
     if (id===null||id===''||r[ix('Farebasis')]==null) continue;
-    const key=rowKey(r[ix('Penalty Type')],r[ix('Farebasis')],r[ix('Leg')],r[ix('Passenger Type')],r[ix('Application Type')],r[ix('Before or After flight')],r[ix('Between(hours)')],r[ix('And(hours)')]);
+    const key=rowKey(r[ix('Penalty Type')],r[ix('Farebasis')],r[ix('Leg')],r[ix('Passenger Type')],r[ix('Application Type')],r[ix('Before or After flight')],r[ix('Between(hours)')],r[ix('And(hours)')],r[ix('Currency')]);
     if (!map.has(key)) map.set(key,id);
     count++;
   }
   return {map,count};
 }
 function rowCells(r,n){
-  const v={A:r.action,D:r.fare,F:r.leg,H:r.pax,J:r.ptype,L:FIXED.atype,N:FIXED.from,O:FIXED.to,
+  const v={A:r.action,D:r.fare,F:r.leg,H:r.pax,J:r.ptype,L:FIXED.atype,N:r.from,O:r.to,
     P:r.ba,R:r.cur,T:r.modAmt,U:r.modMode,W:r.refAmt,X:r.refMode};
   if (r.id!==undefined) v.C=r.id;
   const cells={};
@@ -388,7 +387,7 @@ function load(){
   }catch(e){}
 }
 function ensureNoShow(){if(!state.pen.NoShow)state.pen.NoShow=blankPen();}
-const EX_KEY='penalties-existing-v1';
+const EX_KEY='penalties-existing-v2';
 function loadExisting(){try{const o=JSON.parse(localStorage.getItem(EX_KEY)||'null');if(o&&Array.isArray(o.pairs)){state.existing=new Map(o.pairs);state.existingName=o.name||'';}}catch(e){}}
 function saveExisting(){try{if(state.existing.size)localStorage.setItem(EX_KEY,JSON.stringify({name:state.existingName,pairs:[...state.existing]}));else localStorage.removeItem(EX_KEY);}catch(e){}}
 function save(){
@@ -487,8 +486,8 @@ function drawPreview(){
     $('prev-count').textContent=''; $('btn-add').disabled=true; $('why').textContent=probs.join(' · '); return;
   }
   const rule=draftRule(),rows=annotate(ruleRows(rule),state.existing),show=rows.slice(0,20);
-  t.innerHTML='<thead><tr><th>Action</th><th class="latin">ID</th><th class="latin">Farebasis</th><th class="latin">Leg</th><th>Passenger</th><th>Type</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th></tr></thead><tbody>'+
-    show.map(r=>`<tr><td><span class="tag ${r.action==='Add'?'add':'upd'} latin">${r.action}</span></td><td class="latin">${r.id===undefined?'—':esc(r.id)}</td><td class="latin">${esc(r.fare)}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(r.pax)}</td><td class="latin">${r.ptype}</td>
+  t.innerHTML='<thead><tr><th>Action</th><th class="latin">ID</th><th class="latin">Farebasis</th><th class="latin">Leg</th><th>Passenger</th><th>Type</th><th>Hours</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th></tr></thead><tbody>'+
+    show.map(r=>`<tr><td><span class="tag ${r.action==='Add'?'add':'upd'} latin">${r.action}</span></td><td class="latin">${r.id===undefined?'—':esc(r.id)}</td><td class="latin">${esc(r.fare)}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(r.pax)}</td><td class="latin">${r.ptype}</td><td class="latin">${r.from}–${r.to}</td>
       <td><span class="tag ${r.ba==='After'?'after':''} latin">${r.ba}</span></td>
       <td class="latin v-mod">${fmtPen(r.modAmt,r.modMode,r.cur)}</td><td class="latin v-ref">${fmtPen(r.refAmt,r.refMode,r.cur)}</td></tr>`).join('')+'</tbody>';
   $('prev-count').textContent=rows.length>show.length?`First ${show.length} of ${rows.length} rows (${actSummary(rows)})`:`${plural(rows.length)} (${actSummary(rows)})`;
