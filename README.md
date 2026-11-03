@@ -10,6 +10,8 @@ Fixed values: Penalty Type `Classic`, Application Type `By coupon`, Classic rows
 
 Action and ID: import an existing export file (the Penalties sheet with IDs). A row that matches an existing penalty (Penalty Type, Farebasis, Leg, Passenger, Before/After, hours, Currency) becomes `Update` with its ID. Any other row becomes `Add` with no ID. The current Modification and Refund values are stored too, so each row is shown as Changed, Same or New, with the old value next to the new one.
 
+Each import is saved in the browser and merged into the stored table: values in the new file overwrite the old ones, other penalties stay.
+
 Built-in penalties: if `data/penalties.json` exists next to the page, it is loaded on start as the ID table (no import needed). It is not committed here because this repo is public and the file holds real fare data.
 
 No build step and no backend: open `index.html` or host it on GitHub Pages. Reference codes are embedded in the page; currencies are set in `ENABLED_CURRENCIES`.

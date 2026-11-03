@@ -579,7 +579,18 @@ $('ex-file').addEventListener('change',async e=>{
   try{
     const {map,count}=parseExisting(await f.arrayBuffer());
     if(!map.size){say('bad','No penalty rows with IDs found in that file.');}
-    else{state.existing=map;state.existingName=f.name;state.imported=true;saveExisting();refresh();say('ok',`Loaded ${count} existing penalties.`);}
+    else{
+      // Merge: values from the new file overwrite old ones; penalties not in the file stay as they were.
+      let changed=0,added=0;
+      for(const [k,v] of map){
+        const old=state.existing.get(k);
+        if(!old)added++;
+        else if(Number(old.modAmt)!==Number(v.modAmt)||old.modMode!==v.modMode||Number(old.refAmt)!==Number(v.refAmt)||old.refMode!==v.refMode||old.id!==v.id)changed++;
+        state.existing.set(k,v);
+      }
+      state.existingName=f.name+' (latest import)';state.imported=true;saveExisting();refresh();
+      say('ok',`Saved ${count} penalties from the file: ${changed} changed, ${added} new.`);
+    }
   }catch(err){say('bad','Could not read the file: '+(err&&err.message?err.message:'Unknown error'));}
   e.target.value='';
 });
