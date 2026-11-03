@@ -89,7 +89,7 @@ button.link{border:0;background:none;color:var(--accent);padding:2px 6px;min-hei
 .fixed-note{color:var(--muted);font-size:13px;margin-top:10px}
 .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:7px}
 table{border-collapse:collapse;width:100%;font-size:13.5px}
-th,td{padding:7px 10px;text-align:start;border-bottom:1px solid var(--line);white-space:nowrap}
+th,td{padding:7px 8px;text-align:start;border-bottom:1px solid var(--line);white-space:nowrap}
 th{background:var(--surface-2);font-weight:500;color:var(--muted);font-size:12.5px}
 tr:last-child td{border-bottom:0}
 td.latin,th.latin{direction:ltr;text-align:left}
@@ -129,6 +129,9 @@ td.v-mod{color:var(--mod);font-weight:500} td.v-ref{color:var(--ref);font-weight
 .ex-s{overflow-wrap:anywhere}.ex-s.good{color:var(--good)}.ex-s.warn{color:var(--warn)}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tag.upd{background:var(--accent-soft)}
+.tag.chg{background:var(--mod-soft);color:var(--mod)}
+.tag.same{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.was{color:var(--muted);font-size:11.5px;font-weight:400;text-decoration:line-through}
 .tag.add{background:transparent;border:1px solid var(--good);color:var(--good)}
 .noshow-box h3{display:flex;align-items:center;gap:10px}
 .noshow-box .inc{margin-inline-start:auto;display:flex;align-items:center;gap:8px;font-weight:500;font-size:14px;cursor:pointer}
@@ -273,8 +276,14 @@ function rowKey(ptype,fare,leg,pax,atype,ba,from,to,cur){
 /* Existing penalty (found by key) => Update with its ID. Not found => Add, no ID. */
 function annotate(rows,existing){
   for (const r of rows){
-    const id=existing?existing.get(rowKey(r.ptype,r.fare,r.leg,r.pax,FIXED.atype,r.ba,r.from,r.to,r.cur)):undefined;
-    if (id!==undefined){r.action='Update';r.id=id;} else {r.action='Add';r.id=undefined;}
+    const ex=existing?existing.get(rowKey(r.ptype,r.fare,r.leg,r.pax,FIXED.atype,r.ba,r.from,r.to,r.cur)):undefined;
+    r.prev=undefined; r.modDiff=r.refDiff=false;
+    if (ex){
+      r.action='Update'; r.id=ex.id; r.prev=ex;
+      r.modDiff=Number(ex.modAmt)!==Number(r.modAmt)||ex.modMode!==r.modMode;
+      r.refDiff=Number(ex.refAmt)!==Number(r.refAmt)||ex.refMode!==r.refMode;
+      r.change=(r.modDiff||r.refDiff)?'Changed':'Same';
+    } else {r.action='Add'; r.id=undefined; r.change='New';}
   }
   return rows;
 }
@@ -286,8 +295,8 @@ function generateRows(batch,existing){
     map.set(key,r);
   }
   const rows=annotate([...map.values()],existing);
-  const updates=rows.filter(r=>r.action==='Update').length;
-  return {rows,overridden,updates,adds:rows.length-updates};
+  const n=k=>rows.filter(r=>r.change===k).length;
+  return {rows,overridden,changed:n('Changed'),same:n('Same'),adds:n('New'),updates:n('Changed')+n('Same')};
 }
 /* Read an existing export (Penalties sheet with IDs) into Map(key -> ID) */
 function parseExisting(buf){
@@ -296,7 +305,7 @@ function parseExisting(buf){
   const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   const h=(data[0]||[]).map(x=>x==null?'':String(x).trim());
   const ix=n=>h.indexOf(n);
-  const need=['ID','Farebasis','Leg','Passenger Type','Penalty Type','Application Type','Between(hours)','And(hours)','Before or After flight','Currency'];
+  const need=['ID','Farebasis','Leg','Passenger Type','Penalty Type','Application Type','Between(hours)','And(hours)','Before or After flight','Currency','Modification pen amount','Modification pen mode','Refund pen amount','Refund pen mode'];
   const miss=need.filter(n=>ix(n)<0);
   if (miss.length) throw new Error('Missing columns: '+miss.join(', '));
   const map=new Map(); let count=0;
@@ -304,7 +313,7 @@ function parseExisting(buf){
     const r=data[i],id=r[ix('ID')];
     if (id===null||id===''||r[ix('Farebasis')]==null) continue;
     const key=rowKey(r[ix('Penalty Type')],r[ix('Farebasis')],r[ix('Leg')],r[ix('Passenger Type')],r[ix('Application Type')],r[ix('Before or After flight')],r[ix('Between(hours)')],r[ix('And(hours)')],r[ix('Currency')]);
-    if (!map.has(key)) map.set(key,id);
+    if (!map.has(key)) map.set(key,{id,modAmt:r[ix('Modification pen amount')],modMode:r[ix('Modification pen mode')],refAmt:r[ix('Refund pen amount')],refMode:r[ix('Refund pen mode')]});
     count++;
   }
   return {map,count};
@@ -387,9 +396,9 @@ function load(){
   }catch(e){}
 }
 function ensureNoShow(){if(!state.pen.NoShow)state.pen.NoShow=blankPen();}
-const EX_KEY='penalties-existing-v2';
-function loadExisting(){try{const o=JSON.parse(localStorage.getItem(EX_KEY)||'null');if(o&&Array.isArray(o.pairs)){state.existing=new Map(o.pairs);state.existingName=o.name||'';}}catch(e){}}
-function saveExisting(){try{if(state.existing.size)localStorage.setItem(EX_KEY,JSON.stringify({name:state.existingName,pairs:[...state.existing]}));else localStorage.removeItem(EX_KEY);}catch(e){}}
+const EX_KEY='penalties-existing-v3';
+function loadExisting(){try{const o=JSON.parse(localStorage.getItem(EX_KEY)||'null');if(o&&Array.isArray(o.pairs)){state.existing=new Map(o.pairs.map(([k,v])=>[k,{id:v[0],modAmt:v[1],modMode:v[2],refAmt:v[3],refMode:v[4]}]));state.existingName=o.name||'';}}catch(e){}}
+function saveExisting(){try{if(state.existing.size)localStorage.setItem(EX_KEY,JSON.stringify({name:state.existingName,pairs:[...state.existing].map(([k,v])=>[k,[v.id,v.modAmt,v.modMode,v.refAmt,v.refMode]])}));else localStorage.removeItem(EX_KEY);}catch(e){}}
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify({fares:[...state.fares],legs:[...state.legs],pen:state.pen,cur:state.cur,
     noshowOn:state.noshowOn,startId:state.startId,batch:state.batch}));}catch(e){}
@@ -474,7 +483,7 @@ function draftProblems(){
   const out=[]; if(!state.fares.size)out.push('Select a fare class'); if(!state.legs.size)out.push('Select at least one leg');
   if(Object.values(penErrors()).some(Boolean))out.push('Fix the penalty values'); return out;
 }
-function actSummary(rows){const u=rows.filter(r=>r.action==='Update').length;return `${u} update, ${rows.length-u} add`;}
+function actSummary(rows){const n=k=>rows.filter(r=>r.change===k).length;return `${n('Changed')} changed, ${n('Same')} same, ${n('New')} new`;}
 function fmtPen(amt,mode,cur){return mode==='Percentage'?fmtAmt(amt)+'%':fmtAmt(amt)+' '+cur;}
 
 function drawPreview(){
@@ -486,10 +495,11 @@ function drawPreview(){
     $('prev-count').textContent=''; $('btn-add').disabled=true; $('why').textContent=probs.join(' · '); return;
   }
   const rule=draftRule(),rows=annotate(ruleRows(rule),state.existing),show=rows.slice(0,20);
-  t.innerHTML='<thead><tr><th>Action</th><th class="latin">ID</th><th class="latin">Farebasis</th><th class="latin">Leg</th><th>Passenger</th><th>Type</th><th>Hours</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th></tr></thead><tbody>'+
-    show.map(r=>`<tr><td><span class="tag ${r.action==='Add'?'add':'upd'} latin">${r.action}</span></td><td class="latin">${r.id===undefined?'—':esc(r.id)}</td><td class="latin">${esc(r.fare)}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(r.pax)}</td><td class="latin">${r.ptype}</td><td class="latin">${r.from}–${r.to}</td>
+  const shortFare=f=>f.split(' ')[0], shortPax=p=>p.replace(/\(.*\)/,'');
+  t.innerHTML='<thead><tr><th>Action</th><th>Change</th><th class="latin">Fare</th><th class="latin">Leg</th><th>Passenger</th><th>Type</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th><th class="latin">ID</th></tr></thead><tbody>'+
+    show.map(r=>`<tr><td><span class="tag ${r.action==='Add'?'add':'upd'} latin">${r.action}</span></td><td><span class="tag ${r.change==='Changed'?'chg':r.change==='Same'?'same':'add'} latin">${r.change}</span></td><td class="latin" title="${esc(r.fare)}">${esc(shortFare(r.fare))}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(shortPax(r.pax))}</td><td class="latin" title="${r.from} to ${r.to} hours">${r.ptype}</td>
       <td><span class="tag ${r.ba==='After'?'after':''} latin">${r.ba}</span></td>
-      <td class="latin v-mod">${fmtPen(r.modAmt,r.modMode,r.cur)}</td><td class="latin v-ref">${fmtPen(r.refAmt,r.refMode,r.cur)}</td></tr>`).join('')+'</tbody>';
+      <td class="latin v-mod">${fmtPen(r.modAmt,r.modMode,r.cur)}${r.modDiff?`<div class="was">was ${fmtPen(r.prev.modAmt,r.prev.modMode,r.cur)}</div>`:''}</td><td class="latin v-ref">${fmtPen(r.refAmt,r.refMode,r.cur)}${r.refDiff?`<div class="was">was ${fmtPen(r.prev.refAmt,r.prev.refMode,r.cur)}</div>`:''}</td><td class="latin">${r.id===undefined?'—':esc(r.id)}</td></tr>`).join('')+'</tbody>';
   $('prev-count').textContent=rows.length>show.length?`First ${show.length} of ${rows.length} rows (${actSummary(rows)})`:`${plural(rows.length)} (${actSummary(rows)})`;
   $('btn-add').disabled=false; $('btn-add').textContent=`Add ${plural(rows.length)} to file`;
   $('why').textContent='';
@@ -497,8 +507,8 @@ function drawPreview(){
 
 /* --- Batch --- */
 function drawBatch(){
-  const {rows,overridden,updates,adds}=generateRows(state.batch.map(b=>b.rule),state.existing);
-  $('act').innerHTML=rows.length?`<span class="tag upd latin">${updates} Update</span><span class="tag add latin">${adds} Add</span>`:'';
+  const {rows,overridden,changed,same,adds}=generateRows(state.batch.map(b=>b.rule),state.existing);
+  $('act').innerHTML=rows.length?`<span class="tag chg latin">${changed} Changed</span><span class="tag same latin">${same} Same</span><span class="tag add latin">${adds} New</span>`:'';
   $('tot-rows').textContent=rows.length; $('tot-rules').textContent=state.batch.length;
   $('batch-list').innerHTML=state.batch.length?state.batch.map((b,i)=>{
     const r=b.rule,n=ruleRows(r).length,bf=r.pen.Before,af=r.pen.After;
