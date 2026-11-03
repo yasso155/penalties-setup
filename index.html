@@ -115,13 +115,20 @@ td.latin,th.latin{direction:ltr;text-align:left}
 .pen-card .pen-box h3{font-size:15px;margin-bottom:6px}
 .pen-card .num{font-size:20px;min-height:48px}
 .pen-card select{min-height:48px}
-.pen-card .f-row{grid-template-columns:minmax(0,1fr) 150px}
+.pen-card .f-row{grid-template-columns:minmax(0,1fr) 170px}
 .lbl.mod,.th-mod{color:var(--mod)} .lbl.ref,.th-ref{color:var(--ref)}
 .lbl.mod,.lbl.ref{font-weight:600}
 .num.mod{border-color:var(--mod);background:var(--mod-soft)} .num.ref{border-color:var(--ref);background:var(--ref-soft)}
 .num.mod:focus-visible{outline-color:var(--mod)} .num.ref:focus-visible{outline-color:var(--ref)}
 .num.bad{border-color:var(--bad)}
 td.v-mod{color:var(--mod);font-weight:500} td.v-ref{color:var(--ref);font-weight:500}
+.noshow-box h3{display:flex;align-items:center;gap:10px}
+.noshow-box .inc{margin-inline-start:auto;display:flex;align-items:center;gap:8px;font-weight:500;font-size:14px;cursor:pointer}
+.noshow-box .inc input{width:16px;height:16px;accent-color:var(--accent)}
+.ns-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.noshow-box.off .ns-grid{opacity:.5}
+.tag.ns{background:var(--ink);color:var(--bg)}
+@media (max-width:560px){.ns-grid{grid-template-columns:minmax(0,1fr)}}
 .pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
 .quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
 .quick button{display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:8px 12px;min-height:56px;text-align:start}
@@ -165,6 +172,7 @@ details.more[open]>summary{margin-bottom:6px}
           <div class="pen-box" id="box-Before"></div>
           <div class="pen-box" id="box-After"></div>
         </div>
+        <div class="pen-box noshow-box" id="box-NoShow"></div>
         <label class="chk" for="infant"><input type="checkbox" id="infant"> Include Infant rows with zero penalty</label>
       </section>
 
@@ -214,7 +222,7 @@ const ENABLED_CURRENCIES = ['SDG','USD','AED','SAR','QAR','OMR','EGP'];   // add
 const QUICK_FARES = [['S','S-S - Economy Class','Economy Class'],['H','H-H - High Fare','High Fare'],['Y','Y-Y - Full Fare','Full Fare'],['J','J-J - Business Class','Business Class']];
 const PAX_WITH_PENALTY = ['Adult(s)','Child(ren)'];
 const PAX_INFANT = 'Infant(s)';
-const FIXED = {action:'Update', ptype:'Classic', atype:'By coupon', from:0, to:10000};
+const FIXED = {action:'Update', atype:'By coupon', from:0, to:10000};
 const BA_ORDER = ['Before','After'];
 
 const COLS = ['Action Type','AC','ID','Farebasis','FA','Leg','CP','Passenger Type','PA','Penalty Type','PT','Application Type','AT',
@@ -232,23 +240,25 @@ function fmtAmt(a){return Number.isInteger(a)?String(a):String(+a.toFixed(4));}
 /* pen: {Before:{mod:{amt,mode},ref:{amt,mode}}, After:{...}} */
 function ruleRows(rule){
   const out=[];
-  for (const ba of BA_ORDER){
-    const p = rule.pen[ba];
-    const paxList = rule.infant ? PAX_WITH_PENALTY.concat([PAX_INFANT]) : PAX_WITH_PENALTY;
+  const paxList = rule.infant ? PAX_WITH_PENALTY.concat([PAX_INFANT]) : PAX_WITH_PENALTY;
+  const sets=[['Classic',ba=>rule.pen[ba]]];
+  if (rule.noshow) sets.push(['NoShow',()=>rule.noshow]);   // NoShow: same values for Before and After
+  for (const [ptype,get] of sets) for (const ba of BA_ORDER){
+    const p = get(ba);
     for (const fare of rule.fares) for (const leg of rule.legs) for (const pax of paxList){
       const zero = pax===PAX_INFANT;
-      out.push({fare,leg,pax,ba,cur:rule.cur,
+      out.push({ptype,fare,leg,pax,ba,cur:rule.cur,
         modAmt: zero?0:p.mod.amt, modMode: zero?'Value':p.mod.mode,
         refAmt: zero?0:p.ref.amt, refMode: zero?'Value':p.ref.mode});
     }
   }
   return out;
 }
-/* If the same (Farebasis, Leg, Passenger, Before/After) repeats, the later rule replaces the earlier one in place */
+/* If the same (Penalty Type, Farebasis, Leg, Passenger, Before/After) repeats, the later rule replaces the earlier one in place */
 function generateRows(batch,startId){
   const map=new Map(); let overridden=0;
   for (const rule of batch) for (const r of ruleRows(rule)){
-    const key=[r.fare,r.leg,r.pax,r.ba].join('|');
+    const key=[r.ptype,r.fare,r.leg,r.pax,r.ba].join('|');
     if (map.has(key)) overridden++;
     map.set(key,r);
   }
@@ -257,7 +267,7 @@ function generateRows(batch,startId){
   return {rows,overridden};
 }
 function rowCells(r,n){
-  const v={A:FIXED.action,C:r.id,D:r.fare,F:r.leg,H:r.pax,J:FIXED.ptype,L:FIXED.atype,N:FIXED.from,O:FIXED.to,
+  const v={A:FIXED.action,C:r.id,D:r.fare,F:r.leg,H:r.pax,J:r.ptype,L:FIXED.atype,N:FIXED.from,O:FIXED.to,
     P:r.ba,R:r.cur,T:r.modAmt,U:r.modMode,W:r.refAmt,X:r.refMode};
   const cells={};
   for (const L in v) cells[L]={t:typeof v[L]==='number'?'n':'s',v:v[L]};
@@ -312,12 +322,14 @@ const plural=n=>n+(n===1?' row':' rows');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const KEY='penalties-builder-v1';
 
+const blankPen=()=>({mod:{amt:'',mode:'Value'},ref:{amt:'',mode:'Value'}});
 const state={
   fares:new Set(['S-S - Economy Class']),
   legs:new Set(['PZU-JED']),
   pen:{Before:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
-       After:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}}},
-  cur:'USD', infant:false, startId:'1', batch:[]
+       After:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
+       NoShow:blankPen()},
+  cur:'USD', infant:false, startId:'1', batch:[], noshowOn:false
 };
 function load(){
   try{
@@ -326,13 +338,14 @@ function load(){
     if(Array.isArray(s.legs))state.legs=new Set(s.legs.filter(x=>CODE.leg.has(x)));
     if(s.pen&&s.pen.Before&&s.pen.After)state.pen=s.pen;
     if(ENABLED_CURRENCIES.includes(s.cur))state.cur=s.cur;
-    state.infant=!!s.infant; if(s.startId)state.startId=String(s.startId);
+    state.noshowOn=!!s.noshowOn; state.infant=!!s.infant; if(s.startId)state.startId=String(s.startId);
     if(Array.isArray(s.batch))state.batch=s.batch;
   }catch(e){}
 }
+function ensureNoShow(){if(!state.pen.NoShow)state.pen.NoShow=blankPen();}
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify({fares:[...state.fares],legs:[...state.legs],pen:state.pen,cur:state.cur,
-    infant:state.infant,startId:state.startId,batch:state.batch}));}catch(e){}
+    infant:state.infant,noshowOn:state.noshowOn,startId:state.startId,batch:state.batch}));}catch(e){}
 }
 
 /* --- Picker (search + multi-select) --- */
@@ -366,18 +379,31 @@ function makePicker(root,items,set,placeholder,onChange){
 
 /* --- Penalty form --- */
 function modeOpts(sel){return REF.mode.map(([l])=>`<option value="${l}"${l===sel?' selected':''}>${l==='Value'?'Value (amount)':'Percentage (%)'}</option>`).join('');}
+function penFields(ba,off){
+  const p=state.pen[ba];
+  return ['mod','ref'].map(k=>`<div><label class="lbl ${k}" for="${ba}-${k}-amt">${k==='mod'?'Modification':'Refund'}</label>
+      <div class="f-row"><input class="num ${k}" id="${ba}-${k}-amt" type="text" inputmode="decimal" autocomplete="off" value="${esc(p[k].amt)}" data-ba="${ba}" data-k="${k}"${off?' disabled':''}>
+      <select id="${ba}-${k}-mode" aria-label="Type" data-ba="${ba}" data-k="${k}"${off?' disabled':''}>${modeOpts(p[k].mode)}</select></div>
+      <div class="err" id="${ba}-${k}-err"></div></div>`).join('');
+}
 function drawPen(ba){
-  const p=state.pen[ba],box=$('box-'+ba);
+  const box=$('box-'+ba);
+  if(ba==='NoShow'){
+    box.classList.toggle('off',!state.noshowOn);
+    box.innerHTML=`<h3><span class="tag ns latin">NoShow</span><label class="inc" for="ns-on"><input type="checkbox" id="ns-on"${state.noshowOn?' checked':''}> Include NoShow</label></h3>
+      <div class="ns-grid">${penFields('NoShow',!state.noshowOn)}</div>`;
+    return;
+  }
   box.innerHTML=`<h3><span class="tag ${ba==='After'?'after':''} latin">${ba}</span>flight${ba==='After'?'<button class="link" type="button" data-copy>Copy from Before</button>':''}</h3>
     ${['mod','ref'].map(k=>`<label class="lbl ${k}" for="${ba}-${k}-amt">${k==='mod'?'Modification':'Refund'}</label>
-      <div class="f-row"><input class="num ${k}" id="${ba}-${k}-amt" type="text" inputmode="decimal" autocomplete="off" value="${esc(p[k].amt)}" data-ba="${ba}" data-k="${k}">
-      <select id="${ba}-${k}-mode" aria-label="Type" data-ba="${ba}" data-k="${k}">${modeOpts(p[k].mode)}</select></div>
+      <div class="f-row"><input class="num ${k}" id="${ba}-${k}-amt" type="text" inputmode="decimal" autocomplete="off" value="${esc(state.pen[ba][k].amt)}" data-ba="${ba}" data-k="${k}">
+      <select id="${ba}-${k}-mode" aria-label="Type" data-ba="${ba}" data-k="${k}">${modeOpts(state.pen[ba][k].mode)}</select></div>
       <div class="err" id="${ba}-${k}-err"></div>`).join('')}`;
 }
 function wirePen(){
   document.querySelectorAll('.pen-box').forEach(box=>{
     box.addEventListener('input',e=>{const t=e.target;if(t.dataset.k&&t.tagName==='INPUT'){state.pen[t.dataset.ba][t.dataset.k].amt=t.value;refresh();}});
-    box.addEventListener('change',e=>{const t=e.target;if(t.dataset.k&&t.tagName==='SELECT'){state.pen[t.dataset.ba][t.dataset.k].mode=t.value;refresh();}});
+    box.addEventListener('change',e=>{const t=e.target;if(t.id==='ns-on'){state.noshowOn=t.checked;drawPen('NoShow');refresh();return;}if(t.dataset.k&&t.tagName==='SELECT'){state.pen[t.dataset.ba][t.dataset.k].mode=t.value;refresh();}});
     box.addEventListener('click',e=>{if(e.target.dataset.copy!==undefined){state.pen.After=JSON.parse(JSON.stringify(state.pen.Before));drawPen('After');refresh();}});
   });
 }
@@ -388,12 +414,14 @@ function penErrors(){
   for(const ba of BA_ORDER)for(const k of ['mod','ref']){
     const p=state.pen[ba][k]; errs[ba+'-'+k]=amtError(p.amt,p.mode);
   }
+  for(const k of ['mod','ref']){const p=state.pen.NoShow[k]; errs['NoShow-'+k]=state.noshowOn?amtError(p.amt,p.mode):'';}
   return errs;
 }
 function draftRule(){
   const num=x=>({amt:parseAmt(x.amt),mode:x.mode});
   const pen={};for(const ba of BA_ORDER)pen[ba]={mod:num(state.pen[ba].mod),ref:num(state.pen[ba].ref)};
-  return {fares:[...state.fares],legs:[...state.legs],pen,cur:state.cur,infant:state.infant};
+  const noshow=state.noshowOn?{mod:num(state.pen.NoShow.mod),ref:num(state.pen.NoShow.ref)}:null;
+  return {fares:[...state.fares],legs:[...state.legs],pen,noshow,cur:state.cur,infant:state.infant};
 }
 function draftProblems(){
   const out=[]; if(!state.fares.size)out.push('Select a fare class'); if(!state.legs.size)out.push('Select at least one leg');
@@ -410,9 +438,9 @@ function drawPreview(){
     t.innerHTML='<tbody><tr><td class="empty-note" style="white-space:normal">'+esc(probs.join(' · '))+'</td></tr></tbody>';
     $('prev-count').textContent=''; $('btn-add').disabled=true; $('why').textContent=probs.join(' · '); return;
   }
-  const rule=draftRule(),rows=ruleRows(rule),show=rows.slice(0,12);
-  t.innerHTML='<thead><tr><th class="latin">Farebasis</th><th class="latin">Leg</th><th>Passenger</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th></tr></thead><tbody>'+
-    show.map(r=>`<tr><td class="latin">${esc(r.fare)}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(r.pax)}</td>
+  const rule=draftRule(),rows=ruleRows(rule),show=rows.slice(0,20);
+  t.innerHTML='<thead><tr><th class="latin">Farebasis</th><th class="latin">Leg</th><th>Passenger</th><th>Type</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th></tr></thead><tbody>'+
+    show.map(r=>`<tr><td class="latin">${esc(r.fare)}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(r.pax)}</td><td class="latin">${r.ptype}</td>
       <td><span class="tag ${r.ba==='After'?'after':''} latin">${r.ba}</span></td>
       <td class="latin v-mod">${fmtPen(r.modAmt,r.modMode,r.cur)}</td><td class="latin v-ref">${fmtPen(r.refAmt,r.refMode,r.cur)}</td></tr>`).join('')+'</tbody>';
   $('prev-count').textContent=rows.length>show.length?`First ${show.length} of ${rows.length} rows`:plural(rows.length);
@@ -429,7 +457,8 @@ function drawBatch(){
     return `<li class="batch-item"><div class="meta"><b>${r.fares.length} class × ${r.legs.length} leg</b> · ${plural(n)}
       <div class="sub2 latin">${esc(r.fares.slice(0,2).join(', '))}${r.fares.length>2?' +'+(r.fares.length-2):''}</div>
       <div class="sub2 latin">${esc(r.legs.slice(0,4).join(', '))}${r.legs.length>4?' +'+(r.legs.length-4):''}</div>
-      <div class="sub2 latin">Before <span class="v-mod">${fmtPen(bf.mod.amt,bf.mod.mode,r.cur)}</span> / <span class="v-ref">${fmtPen(bf.ref.amt,bf.ref.mode,r.cur)}</span> · After <span class="v-mod">${fmtPen(af.mod.amt,af.mod.mode,r.cur)}</span> / <span class="v-ref">${fmtPen(af.ref.amt,af.ref.mode,r.cur)}</span></div></div>
+      <div class="sub2 latin">Before <span class="v-mod">${fmtPen(bf.mod.amt,bf.mod.mode,r.cur)}</span> / <span class="v-ref">${fmtPen(bf.ref.amt,bf.ref.mode,r.cur)}</span> · After <span class="v-mod">${fmtPen(af.mod.amt,af.mod.mode,r.cur)}</span> / <span class="v-ref">${fmtPen(af.ref.amt,af.ref.mode,r.cur)}</span></div>
+      ${r.noshow?`<div class="sub2 latin">NoShow <span class="v-mod">${fmtPen(r.noshow.mod.amt,r.noshow.mod.mode,r.cur)}</span> / <span class="v-ref">${fmtPen(r.noshow.ref.amt,r.noshow.ref.mode,r.cur)}</span></div>`:''}</div>
       <button class="link" type="button" data-del="${i}" aria-label="Delete group">Delete</button></li>`;}).join('')
     :'<li class="empty-note" style="padding:6px 0">Empty</li>';
   $('btn-export').disabled=!rows.length;
@@ -449,7 +478,7 @@ function refresh(){drawQuick();drawPreview();drawBatch();save();}
 function say(cls,txt){const s=$('status');s.className='status '+cls;s.textContent=txt;s.dataset.keep='1';setTimeout(()=>{delete s.dataset.keep;},4000);}
 
 /* --- Wire up --- */
-load();
+load();ensureNoShow();
 const farePicker=makePicker($('fare-picker'),REF.fare.map(x=>x[0]),state.fares,'Search Farebasis',refresh);
 const legPicker=makePicker($('leg-picker'),REF.leg.map(x=>x[0]),state.legs,'Search Leg, e.g. JED',refresh);
 $('fare-quick').addEventListener('click',e=>{
@@ -459,7 +488,7 @@ $('fare-quick').addEventListener('click',e=>{
   else state.fares.has(v)?state.fares.delete(v):state.fares.add(v);
   farePicker.redraw();refresh();
 });
-drawPen('Before');drawPen('After');wirePen();
+drawPen('Before');drawPen('After');drawPen('NoShow');wirePen();
 if([...state.fares].some(l=>!QUICK_FARES.some(q=>q[1]===l)))$('fare-more').open=true;
 $('cur').innerHTML=ENABLED_CURRENCIES.map(c=>`<option value="${c}"${c===state.cur?' selected':''}>${c}</option>`).join('');
 $('cur').addEventListener('change',e=>{state.cur=e.target.value;refresh();});
