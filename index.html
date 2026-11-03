@@ -122,6 +122,14 @@ td.latin,th.latin{direction:ltr;text-align:left}
 .num.mod:focus-visible{outline-color:var(--mod)} .num.ref:focus-visible{outline-color:var(--ref)}
 .num.bad{border-color:var(--bad)}
 td.v-mod{color:var(--mod);font-weight:500} td.v-ref{color:var(--ref);font-weight:500}
+.act{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;font-size:13px}
+.act:empty{display:none}
+.existing{border:1px dashed var(--line);border-radius:8px;padding:12px;margin:14px 0;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
+.ex-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ex-s{overflow-wrap:anywhere}.ex-s.good{color:var(--good)}.ex-s.warn{color:var(--warn)}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tag.upd{background:var(--accent-soft)}
+.tag.add{background:transparent;border:1px solid var(--good);color:var(--good)}
 .noshow-box h3{display:flex;align-items:center;gap:10px}
 .noshow-box .inc{margin-inline-start:auto;display:flex;align-items:center;gap:8px;font-weight:500;font-size:14px;cursor:pointer}
 .noshow-box .inc input{width:16px;height:16px;accent-color:var(--accent)}
@@ -205,7 +213,14 @@ details.more[open]>summary{margin-bottom:6px}
           <div><span class="big" id="tot-rows">0</span><small>rows</small></div>
           <div><span class="big" id="tot-rules">0</span><small>groups</small></div>
         </div>
+        <div class="act" id="act"></div>
         <ul class="batch-list" id="batch-list"></ul>
+        <div class="existing">
+          <div class="ex-row"><b>Existing penalties</b><button class="link" id="ex-clear" type="button" hidden>Remove</button></div>
+          <div class="ex-s" id="ex-status"></div>
+          <button type="button" id="ex-btn">Import export file</button>
+          <input type="file" id="ex-file" class="vh" accept=".xlsx,.xls" tabindex="-1" aria-label="Import export file">
+        </div>
         <div class="add-bar"><button class="primary" id="btn-export" type="button">Export Excel</button></div>
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </section>
@@ -252,20 +267,53 @@ function ruleRows(rule){
   return out;
 }
 /* If the same (Penalty Type, Farebasis, Leg, Passenger, Before/After) repeats, the later rule replaces the earlier one in place */
-function generateRows(batch,startId){
+/* Penalty identity: the same key means the same penalty in the booking system */
+function rowKey(ptype,fare,leg,pax,atype,ba,from,to){
+  return [ptype,fare,leg,pax,atype,ba,Number(from),Number(to)].map(x=>String(x).trim()).join('|');
+}
+/* Existing penalty (found by key) => Update with its ID. Not found => Add, no ID. */
+function annotate(rows,existing){
+  for (const r of rows){
+    const id=existing?existing.get(rowKey(r.ptype,r.fare,r.leg,r.pax,FIXED.atype,r.ba,FIXED.from,FIXED.to)):undefined;
+    if (id!==undefined){r.action='Update';r.id=id;} else {r.action='Add';r.id=undefined;}
+  }
+  return rows;
+}
+function generateRows(batch,existing){
   const map=new Map(); let overridden=0;
   for (const rule of batch) for (const r of ruleRows(rule)){
     const key=[r.ptype,r.fare,r.leg,r.pax,r.ba].join('|');
     if (map.has(key)) overridden++;
     map.set(key,r);
   }
-  const rows=[...map.values()];
-  rows.forEach((r,i)=>{r.id=startId+i;});
-  return {rows,overridden};
+  const rows=annotate([...map.values()],existing);
+  const updates=rows.filter(r=>r.action==='Update').length;
+  return {rows,overridden,updates,adds:rows.length-updates};
+}
+/* Read an existing export (Penalties sheet with IDs) into Map(key -> ID) */
+function parseExisting(buf){
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets['Penalties']||wb.Sheets[wb.SheetNames[0]];
+  const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  const h=(data[0]||[]).map(x=>x==null?'':String(x).trim());
+  const ix=n=>h.indexOf(n);
+  const need=['ID','Farebasis','Leg','Passenger Type','Penalty Type','Application Type','Between(hours)','And(hours)','Before or After flight'];
+  const miss=need.filter(n=>ix(n)<0);
+  if (miss.length) throw new Error('Missing columns: '+miss.join(', '));
+  const map=new Map(); let count=0;
+  for (let i=1;i<data.length;i++){
+    const r=data[i],id=r[ix('ID')];
+    if (id===null||id===''||r[ix('Farebasis')]==null) continue;
+    const key=rowKey(r[ix('Penalty Type')],r[ix('Farebasis')],r[ix('Leg')],r[ix('Passenger Type')],r[ix('Application Type')],r[ix('Before or After flight')],r[ix('Between(hours)')],r[ix('And(hours)')]);
+    if (!map.has(key)) map.set(key,id);
+    count++;
+  }
+  return {map,count};
 }
 function rowCells(r,n){
-  const v={A:FIXED.action,C:r.id,D:r.fare,F:r.leg,H:r.pax,J:r.ptype,L:FIXED.atype,N:FIXED.from,O:FIXED.to,
+  const v={A:r.action,D:r.fare,F:r.leg,H:r.pax,J:r.ptype,L:FIXED.atype,N:FIXED.from,O:FIXED.to,
     P:r.ba,R:r.cur,T:r.modAmt,U:r.modMode,W:r.refAmt,X:r.refMode};
+  if (r.id!==undefined) v.C=r.id;
   const cells={};
   for (const L in v) cells[L]={t:typeof v[L]==='number'?'n':'s',v:v[L]};
   for (const L in LOOKUP){
@@ -326,7 +374,7 @@ const state={
   pen:{Before:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
        After:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
        NoShow:blankPen()},
-  cur:'USD', startId:'1', batch:[], noshowOn:false
+  cur:'USD', startId:'1', batch:[], noshowOn:false, existing:new Map(), existingName:''
 };
 function load(){
   try{
@@ -340,6 +388,9 @@ function load(){
   }catch(e){}
 }
 function ensureNoShow(){if(!state.pen.NoShow)state.pen.NoShow=blankPen();}
+const EX_KEY='penalties-existing-v1';
+function loadExisting(){try{const o=JSON.parse(localStorage.getItem(EX_KEY)||'null');if(o&&Array.isArray(o.pairs)){state.existing=new Map(o.pairs);state.existingName=o.name||'';}}catch(e){}}
+function saveExisting(){try{if(state.existing.size)localStorage.setItem(EX_KEY,JSON.stringify({name:state.existingName,pairs:[...state.existing]}));else localStorage.removeItem(EX_KEY);}catch(e){}}
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify({fares:[...state.fares],legs:[...state.legs],pen:state.pen,cur:state.cur,
     noshowOn:state.noshowOn,startId:state.startId,batch:state.batch}));}catch(e){}
@@ -424,7 +475,7 @@ function draftProblems(){
   const out=[]; if(!state.fares.size)out.push('Select a fare class'); if(!state.legs.size)out.push('Select at least one leg');
   if(Object.values(penErrors()).some(Boolean))out.push('Fix the penalty values'); return out;
 }
-function startId(){return 1;}  // IDs are generated automatically from 1
+function actSummary(rows){const u=rows.filter(r=>r.action==='Update').length;return `${u} update, ${rows.length-u} add`;}
 function fmtPen(amt,mode,cur){return mode==='Percentage'?fmtAmt(amt)+'%':fmtAmt(amt)+' '+cur;}
 
 function drawPreview(){
@@ -435,19 +486,20 @@ function drawPreview(){
     t.innerHTML='<tbody><tr><td class="empty-note" style="white-space:normal">'+esc(probs.join(' · '))+'</td></tr></tbody>';
     $('prev-count').textContent=''; $('btn-add').disabled=true; $('why').textContent=probs.join(' · '); return;
   }
-  const rule=draftRule(),rows=ruleRows(rule),show=rows.slice(0,20);
-  t.innerHTML='<thead><tr><th class="latin">Farebasis</th><th class="latin">Leg</th><th>Passenger</th><th>Type</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th></tr></thead><tbody>'+
-    show.map(r=>`<tr><td class="latin">${esc(r.fare)}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(r.pax)}</td><td class="latin">${r.ptype}</td>
+  const rule=draftRule(),rows=annotate(ruleRows(rule),state.existing),show=rows.slice(0,20);
+  t.innerHTML='<thead><tr><th>Action</th><th class="latin">ID</th><th class="latin">Farebasis</th><th class="latin">Leg</th><th>Passenger</th><th>Type</th><th></th><th class="th-mod">Modification</th><th class="th-ref">Refund</th></tr></thead><tbody>'+
+    show.map(r=>`<tr><td><span class="tag ${r.action==='Add'?'add':'upd'} latin">${r.action}</span></td><td class="latin">${r.id===undefined?'—':esc(r.id)}</td><td class="latin">${esc(r.fare)}</td><td class="latin">${esc(r.leg)}</td><td class="latin">${esc(r.pax)}</td><td class="latin">${r.ptype}</td>
       <td><span class="tag ${r.ba==='After'?'after':''} latin">${r.ba}</span></td>
       <td class="latin v-mod">${fmtPen(r.modAmt,r.modMode,r.cur)}</td><td class="latin v-ref">${fmtPen(r.refAmt,r.refMode,r.cur)}</td></tr>`).join('')+'</tbody>';
-  $('prev-count').textContent=rows.length>show.length?`First ${show.length} of ${rows.length} rows`:plural(rows.length);
+  $('prev-count').textContent=rows.length>show.length?`First ${show.length} of ${rows.length} rows (${actSummary(rows)})`:`${plural(rows.length)} (${actSummary(rows)})`;
   $('btn-add').disabled=false; $('btn-add').textContent=`Add ${plural(rows.length)} to file`;
   $('why').textContent='';
 }
 
 /* --- Batch --- */
 function drawBatch(){
-  const {rows,overridden}=generateRows(state.batch.map(b=>b.rule),startId());
+  const {rows,overridden,updates,adds}=generateRows(state.batch.map(b=>b.rule),state.existing);
+  $('act').innerHTML=rows.length?`<span class="tag upd latin">${updates} Update</span><span class="tag add latin">${adds} Add</span>`:'';
   $('tot-rows').textContent=rows.length; $('tot-rules').textContent=state.batch.length;
   $('batch-list').innerHTML=state.batch.length?state.batch.map((b,i)=>{
     const r=b.rule,n=ruleRows(r).length,bf=r.pen.Before,af=r.pen.After;
@@ -471,11 +523,17 @@ function drawQuick(){
     `<button type="button" data-fare="${esc(l)}" aria-pressed="${state.fares.has(l)}" title="${esc(l)}"><b>${k}</b><span class="latin">${esc(n)}</span></button>`).join('')+
     `<button type="button" class="all" data-fare="*all" aria-pressed="${all}">Select all</button>`;
 }
-function refresh(){drawQuick();drawPreview();drawBatch();save();}
+function drawExisting(){
+  const n=state.existing.size,st=$('ex-status');
+  st.className='ex-s '+(n?'good':'warn');
+  st.textContent=n?`${n} penalties loaded${state.existingName?' from '+state.existingName:''}`:'Not imported: every row will be Add.';
+  $('ex-clear').hidden=!n;
+}
+function refresh(){drawExisting();drawQuick();drawPreview();drawBatch();save();}
 function say(cls,txt){const s=$('status');s.className='status '+cls;s.textContent=txt;s.dataset.keep='1';setTimeout(()=>{delete s.dataset.keep;},4000);}
 
 /* --- Wire up --- */
-load();ensureNoShow();
+load();ensureNoShow();loadExisting();
 const farePicker=makePicker($('fare-picker'),REF.fare.map(x=>x[0]),state.fares,'Search Farebasis',refresh);
 const legPicker=makePicker($('leg-picker'),REF.leg.map(x=>x[0]),state.legs,'Search Leg, e.g. JED',refresh);
 $('fare-quick').addEventListener('click',e=>{
@@ -496,10 +554,21 @@ $('btn-add').addEventListener('click',()=>{
   say('ok',`Added ${plural(ruleRows(rule).length)} to the file.`);
 });
 $('batch-list').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;state.batch.splice(+b.dataset.del,1);refresh();});
+$('ex-btn').addEventListener('click',()=>$('ex-file').click());
+$('ex-file').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  try{
+    const {map,count}=parseExisting(await f.arrayBuffer());
+    if(!map.size){say('bad','No penalty rows with IDs found in that file.');}
+    else{state.existing=map;state.existingName=f.name;saveExisting();refresh();say('ok',`Loaded ${count} existing penalties.`);}
+  }catch(err){say('bad','Could not read the file: '+(err&&err.message?err.message:'Unknown error'));}
+  e.target.value='';
+});
+$('ex-clear').addEventListener('click',()=>{state.existing=new Map();state.existingName='';saveExisting();refresh();});
 $('btn-clear').addEventListener('click',()=>{if(!state.batch.length)return;state.batch=[];refresh();say('ok','File cleared.');});
 
 $('btn-export').addEventListener('click',async()=>{
-  const {rows}=generateRows(state.batch.map(b=>b.rule),startId()); if(!rows.length)return;
+  const {rows}=generateRows(state.batch.map(b=>b.rule),state.existing); if(!rows.length)return;
   let dl=null; try{dl=window.claude?await claude.use('downloads'):null;}catch(e){}
   const d=new Date(),p=n=>String(n).padStart(2,'0');
   const name=`Penalties_Export_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}.xlsx`;
