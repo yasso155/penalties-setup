@@ -135,8 +135,8 @@ function start(){
     try{const d=await readVal('settings');if(d){
       if(d.sdgOut>0)P.state.sdgOut=d.sdgOut;if(d.sdgIn>0)P.state.sdgIn=d.sdgIn;}}catch(e){console.warn(e);}
     try{const o=await readVal('drafts/'+uid);if(o&&o.json){const d=JSON.parse(o.json);
-      if(Array.isArray(d.fares))P.state.fares=new Set(d.fares);
-      if(Array.isArray(d.legs))P.state.legs=new Set(d.legs);
+      if(Array.isArray(d.fares)){P.state.fares.clear();d.fares.forEach(x=>P.state.fares.add(x));}   // mutate in place: the pickers hold this Set
+      if(Array.isArray(d.legs)){P.state.legs.clear();d.legs.forEach(x=>P.state.legs.add(x));}
       if(d.pen&&d.pen.Before&&d.pen.After)P.state.pen=d.pen;
       if(d.cur)P.state.cur=d.cur;
       if(typeof d.noshowOn==='boolean')P.state.noshowOn=d.noshowOn;
@@ -148,6 +148,7 @@ function start(){
     if(ex.pairs.length)applyExisting(ex);
     else if(P.state.imported&&P.state.existing.size){await pushExisting();}   // first time: upload what this browser has
     ['Before','After','NoShow'].forEach(b=>P.drawPen(b));
+    if(P.redrawPickers)P.redrawPickers();
     P.refresh();
     listen();
   }

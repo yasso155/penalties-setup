@@ -753,6 +753,6 @@ $('btn-export').addEventListener('click',async()=>{
 });
 refresh();loadBuiltin();
 /* Hooks for the optional cloud layer (cloud.js, standalone hosting only) */
-window.PenApp={state,refresh,drawPen,ensureNoShow,loadBuiltin};
+window.PenApp={state,refresh,drawPen,ensureNoShow,loadBuiltin,redrawPickers(){farePicker.redraw();legPicker.redraw();}};
 document.dispatchEvent(new Event('penapp-ready'));
 </script>
