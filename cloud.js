@@ -168,6 +168,7 @@ function start(){
     unsubs.push(onValue(R('reference'),async s=>{
       if(!s.exists())return;
       await loadReference();
+      if(P.redrawPickers)P.redrawPickers();
       P.refresh();
     }));
   }

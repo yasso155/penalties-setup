@@ -271,6 +271,7 @@ for (const [k] of GROUPS) CODE[k] = new Map(REF[k].map(([l,c])=>[l,c]));
 // Allow cloud.js to rebuild CODE after updating REF
 window.rebuildCode = function(){
   for(const [k] of GROUPS) CODE[k]=new Map(REF[k].map(([l,c])=>[l,c]));
+  if(typeof rebuildAgreement==='function')rebuildAgreement();   // agreement legs depend on the leg list
 };
 
 /* Old drafts stored fare names like "Y - Full Fare"; the real name is "Y-Y - Full Fare". Map them to the real name. */
@@ -514,7 +515,7 @@ function makePicker(root,items,set,placeholder,onChange,badge){
     drawList();drawChips();onChange();
   });
   drawList();drawChips();
-  return {redraw(){drawList();drawChips();}};
+  return {redraw(){drawList();drawChips();},setItems(n){items=n;drawList();drawChips();}};
 }
 
 /* --- Penalty form --- */
@@ -761,6 +762,11 @@ $('btn-export').addEventListener('click',async()=>{
 });
 refresh();loadBuiltin();
 /* Hooks for the optional cloud layer (cloud.js, standalone hosting only) */
-window.PenApp={state,fixFare,refresh,drawPen,ensureNoShow,loadBuiltin,redrawPickers(){farePicker.redraw();legPicker.redraw();}};
+window.PenApp={state,fixFare,refresh,drawPen,ensureNoShow,loadBuiltin,redrawPickers(){
+  /* The reference lists can change after load (legs added or deleted in Settings): rebuild the pickers and drop selections that no longer exist. */
+  for(const l of [...state.legs])if(!CODE.leg.has(l))state.legs.delete(l);
+  for(const f of [...state.fares])if(!CODE.fare.has(f))state.fares.delete(f);
+  legPicker.setItems(REF.leg.map(x=>x[0]));farePicker.setItems(REF.fare.map(x=>x[0]));
+}};
 document.dispatchEvent(new Event('penapp-ready'));
 </script>
