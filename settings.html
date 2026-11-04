@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Penalties Setup — الإعدادات وإدارة البيانات</title>
+<title>Penalties Setup — Settings</title>
 <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon.ico">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -237,7 +237,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  text-align: right;
+  text-align: left;
 }
 th {
   background: #f6f8fa;
@@ -360,12 +360,10 @@ tr:hover td {
 /* --- Tidy-up --- */
 .agr-grid { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
 .agr-card { min-width: 0; }
-.agr-card h4 { direction: ltr; text-align: right; }
 .pen-row { grid-template-columns: 78px repeat(3, minmax(0, 1fr)); }
 .pen-row input { width: 100%; min-width: 0; }
 .table-wrap { max-height: 62vh; overflow: auto; }
 th { position: sticky; top: 0; z-index: 1; }
-td strong, .code-tag { direction: ltr; unicode-bidi: plaintext; }
 .card-title + p { line-height: 1.7; }
 .nav-tabs { position: sticky; top: 67px; z-index: 40; background: var(--bg); padding-top: 4px; }
 </style>
@@ -375,66 +373,66 @@ td strong, .code-tag { direction: ltr; unicode-bidi: plaintext; }
 <header class="header">
   <div class="header-title">
     <a href="index.html" class="back-link">
-      <span>→</span> العودة للتطبيق الرئيسي
+      <span>←</span> Back to app
     </a>
-    <h1>إعدادات النظام وإدارة البيانات</h1>
+    <h1>Settings &amp; Data Management</h1>
   </div>
-  <div id="db-status" class="badge badge-warn">جاري الاتصال بقاعدة البيانات...</div>
+  <div id="db-status" class="badge badge-warn">Connecting to database...</div>
 </header>
 
 <div class="container">
   <nav class="nav-tabs">
-    <button class="tab-btn active" data-tab="tab-legs">🛫 المسارات (Legs)</button>
-    <button class="tab-btn" data-tab="tab-fares">🎟️ الفئات (Farebasis)</button>
-    <button class="tab-btn" data-tab="tab-agreement">📜 الاتفاقية (Agreement)</button>
-    <button class="tab-btn" data-tab="tab-excel">📊 رفع ملف الـ IDs (Import)</button>
-    <button class="tab-btn" data-tab="tab-pax">👥 الركاب (Passengers)</button>
+    <button class="tab-btn active" data-tab="tab-legs">🛫 Legs</button>
+    <button class="tab-btn" data-tab="tab-fares">🎟️ Fare classes</button>
+    <button class="tab-btn" data-tab="tab-agreement">📜 Agreement</button>
+    <button class="tab-btn" data-tab="tab-excel">📊 Import IDs</button>
+    <button class="tab-btn" data-tab="tab-pax">👥 Passengers</button>
   </nav>
 
   <!-- ================= Tab 1: Legs ================= -->
   <div id="tab-legs" class="tab-panel active">
     <div class="card">
-      <h3 class="card-title">➕ إضافة مسار جديد (Add New Leg)</h3>
-      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">أدخل كود المسار من محطتين مثل (KRT-JED أو PZU-DXB) ورقم الـ Code الخاص به في نظام الحجز.</p>
+      <h3 class="card-title">➕ Add new leg</h3>
+      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">Enter the leg as two stations, e.g. KRT-JED or PZU-DXB, with its Code ID from the booking system.</p>
       <form id="form-add-leg" class="form-grid">
         <div class="form-group">
-          <label>كود المسار (Leg Key)*</label>
-          <input type="text" id="leg-key" placeholder="مثال: KRT-DXB" required style="direction:ltr">
+          <label>Leg key*</label>
+          <input type="text" id="leg-key" placeholder="e.g. KRT-DXB" required style="direction:ltr">
         </div>
         <div class="form-group">
-          <label>اسم العرض (Label - اختياري)</label>
-          <input type="text" id="leg-label" placeholder="نفس كود المسار إن ترك فارغاً" style="direction:ltr">
+          <label>Display label (optional)</label>
+          <input type="text" id="leg-label" placeholder="Defaults to the leg key" style="direction:ltr">
         </div>
         <div class="form-group">
-          <label>رقم الكود (Code ID)*</label>
-          <input type="number" id="leg-code" placeholder="مثال: 520" required min="1">
+          <label>Code ID*</label>
+          <input type="number" id="leg-code" placeholder="e.g. 520" required min="1">
         </div>
-        <button type="submit" class="btn btn-primary" id="btn-add-leg">💾 إضافة المسار</button>
+        <button type="submit" class="btn btn-primary" id="btn-add-leg">💾 Add leg</button>
       </form>
     </div>
 
     <div class="card">
       <div class="card-header">
         <div>
-          <h3 class="card-title">قائمة المسارات المسجلة</h3>
-          <span id="legs-count" style="font-size:12px;color:var(--muted)">0 مسار مسجل</span>
+          <h3 class="card-title">Registered legs</h3>
+          <span id="legs-count" style="font-size:12px;color:var(--muted)">0 legs</span>
         </div>
         <div class="search-bar">
-          <input type="text" id="search-legs" placeholder="🔍 بحث في المسارات...">
+          <input type="text" id="search-legs" placeholder="🔍 Search legs...">
         </div>
       </div>
       <div class="table-wrap">
         <table id="table-legs">
           <thead>
             <tr>
-              <th>المسار (Key)</th>
-              <th>اسم العرض (Label)</th>
-              <th>رقم الكود (Code)</th>
-              <th style="width:120px;text-align:center">إجراءات</th>
+              <th>Leg key</th>
+              <th>Label</th>
+              <th>Code</th>
+              <th style="width:120px;text-align:center">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="4" style="text-align:center;color:var(--muted)">جاري تحميل البيانات...</td></tr>
+            <tr><td colspan="4" style="text-align:center;color:var(--muted)">Loading...</td></tr>
           </tbody>
         </table>
       </div>
@@ -444,42 +442,42 @@ td strong, .code-tag { direction: ltr; unicode-bidi: plaintext; }
   <!-- ================= Tab 2: Fares ================= -->
   <div id="tab-fares" class="tab-panel">
     <div class="card">
-      <h3 class="card-title">➕ إضافة فئة تذكرة جديدة (Add Farebasis)</h3>
-      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">أدخل كود الفئة والدرجة (مثل Y-Y - Full Fare) ورقم الكود الخاص بها.</p>
+      <h3 class="card-title">➕ Add new fare class</h3>
+      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">Enter the fare class and cabin (e.g. Y-Y - Full Fare) with its Code ID.</p>
       <form id="form-add-fare" class="form-grid">
         <div class="form-group">
-          <label>كود الفئة (Fare Key / Label)*</label>
-          <input type="text" id="fare-key" placeholder="مثال: S-S - Economy Class" required style="direction:ltr">
+          <label>Fare key / label*</label>
+          <input type="text" id="fare-key" placeholder="e.g. S-S - Economy Class" required style="direction:ltr">
         </div>
         <div class="form-group">
-          <label>رقم الكود (Code ID)*</label>
-          <input type="number" id="fare-code" placeholder="مثال: 84" required min="1">
+          <label>Code ID*</label>
+          <input type="number" id="fare-code" placeholder="e.g. 84" required min="1">
         </div>
-        <button type="submit" class="btn btn-primary" id="btn-add-fare">💾 إضافة الفئة</button>
+        <button type="submit" class="btn btn-primary" id="btn-add-fare">💾 Add fare class</button>
       </form>
     </div>
 
     <div class="card">
       <div class="card-header">
         <div>
-          <h3 class="card-title">قائمة فئات التذاكر</h3>
-          <span id="fares-count" style="font-size:12px;color:var(--muted)">0 فئة مسجلة</span>
+          <h3 class="card-title">Registered fare classes</h3>
+          <span id="fares-count" style="font-size:12px;color:var(--muted)">0 fare classes</span>
         </div>
         <div class="search-bar">
-          <input type="text" id="search-fares" placeholder="🔍 بحث في الفئات...">
+          <input type="text" id="search-fares" placeholder="🔍 Search fare classes...">
         </div>
       </div>
       <div class="table-wrap">
         <table id="table-fares">
           <thead>
             <tr>
-              <th>كود الفئة (Label)</th>
-              <th>رقم الكود (Code)</th>
-              <th style="width:120px;text-align:center">إجراءات</th>
+              <th>Fare class</th>
+              <th>Code</th>
+              <th style="width:120px;text-align:center">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="3" style="text-align:center;color:var(--muted)">جاري تحميل البيانات...</td></tr>
+            <tr><td colspan="3" style="text-align:center;color:var(--muted)">Loading...</td></tr>
           </tbody>
         </table>
       </div>
@@ -491,10 +489,10 @@ td strong, .code-tag { direction: ltr; unicode-bidi: plaintext; }
     <div class="card">
       <div class="card-header">
         <div>
-          <h3 class="card-title">📜 اتفاقية غرامات الوجهات (Agreement Penalties)</h3>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px">قيم الغرامات الافتراضية لكل مجموعة وجهات بالدولار (USD). التعديل هنا يُحفظ في Firebase وينعكس على التطبيق.</p>
+          <h3 class="card-title">📜 Destination agreement penalties</h3>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Default penalty values per destination group, in USD. Changes are saved to Firebase and applied in the app.</p>
         </div>
-        <button type="button" class="btn btn-primary" id="btn-save-agreement">💾 حفظ تغييرات الاتفاقية في السحابة</button>
+        <button type="button" class="btn btn-primary" id="btn-save-agreement">💾 Save agreement changes</button>
       </div>
 
       <div class="agr-grid" id="agr-container">
@@ -506,21 +504,21 @@ td strong, .code-tag { direction: ltr; unicode-bidi: plaintext; }
   <!-- ================= Tab 4: Excel IDs Import ================= -->
   <div id="tab-excel" class="tab-panel">
     <div class="card">
-      <h3 class="card-title">📊 استيراد ورفع ملف الـ IDs (Penalties Export)</h3>
+      <h3 class="card-title">📊 Import IDs (Penalties Export)</h3>
       <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">
-        ارفع شيت الإكسل التصديري السابق الذي يحتوي على عمود <b>ID</b>. سيقوم النظام بحفظ هذه الـ IDs في Firebase Realtime Database مباشرة تحت <code>existing/</code>، ليتمكن أي مستخدم يفتح التطبيق من مطابقة الغرامات وتوليد أمر Update بأرقام الـ IDs الأصلية.
+        Upload a previous export file that has an <b>ID</b> column. The IDs are saved to Firebase Realtime Database under <code>existing/</code>, so any user opening the app can match penalties and generate Update rows with the original IDs.
       </p>
 
       <div class="upload-zone" id="drop-zone">
         <div class="upload-icon">📁</div>
-        <div style="font-weight:600;font-size:15px;margin-bottom:4px">اسحب وأفلت ملف الإكسل هنا، أو اضغط للاختيار</div>
-        <div style="font-size:12px;color:var(--muted)">يدعم ملفات .xlsx و .xls (يجب أن يحتوي شيت Penalties على عمود ID)</div>
+        <div style="font-weight:600;font-size:15px;margin-bottom:4px">Drag and drop the Excel file here, or click to choose</div>
+        <div style="font-size:12px;color:var(--muted)">Supports .xlsx and .xls (the Penalties sheet must have an ID column)</div>
         <input type="file" id="file-excel" accept=".xlsx,.xls" style="display:none">
       </div>
 
       <div id="import-progress" style="display:none;margin-top:20px;padding:16px;background:#f6f8fa;border-radius:8px;border:1px solid var(--line)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <strong id="prog-title">جاري قراءة الملف...</strong>
+          <strong id="prog-title">Reading file...</strong>
           <span id="prog-pct" style="font-weight:600">0%</span>
         </div>
         <div style="height:8px;background:#e1e4e8;border-radius:4px;overflow:hidden">
@@ -532,11 +530,11 @@ td strong, .code-tag { direction: ltr; unicode-bidi: plaintext; }
     <div class="card">
       <div class="card-header">
         <div>
-          <h3 class="card-title">حالة الـ IDs الحالية في السحابة</h3>
-          <div id="cloud-ids-info" style="margin-top:6px;font-size:13px;color:var(--muted)">جاري فحص قاعدة البيانات...</div>
+          <h3 class="card-title">IDs currently in the cloud</h3>
+          <div id="cloud-ids-info" style="margin-top:6px;font-size:13px;color:var(--muted)">Checking database...</div>
         </div>
         <button type="button" class="btn btn-danger btn-sm" id="btn-clear-cloud-ids" style="display:none">
-          🗑️ مسح جميع الـ IDs من السحابة
+          🗑️ Delete all IDs from the cloud
         </button>
       </div>
     </div>
@@ -545,33 +543,33 @@ td strong, .code-tag { direction: ltr; unicode-bidi: plaintext; }
   <!-- ================= Tab 5: Pax ================= -->
   <div id="tab-pax" class="tab-panel">
     <div class="card">
-      <h3 class="card-title">➕ إضافة نوع راكب جديد (Passenger Type)</h3>
+      <h3 class="card-title">➕ Add new passenger type</h3>
       <form id="form-add-pax" class="form-grid">
         <div class="form-group">
-          <label>اسم نوع الراكب (Label)*</label>
-          <input type="text" id="pax-label" placeholder="مثال: Adult(s)" required style="direction:ltr">
+          <label>Passenger type label*</label>
+          <input type="text" id="pax-label" placeholder="e.g. Adult(s)" required style="direction:ltr">
         </div>
         <div class="form-group">
-          <label>رقم الكود (Code ID)*</label>
-          <input type="number" id="pax-code" placeholder="مثال: 1" required min="1">
+          <label>Code ID*</label>
+          <input type="number" id="pax-code" placeholder="e.g. 1" required min="1">
         </div>
-        <button type="submit" class="btn btn-primary" id="btn-add-pax">💾 إضافة</button>
+        <button type="submit" class="btn btn-primary" id="btn-add-pax">💾 Add</button>
       </form>
     </div>
 
     <div class="card">
-      <h3 class="card-title">أنواع الركاب المسجلة</h3>
+      <h3 class="card-title">Registered passenger types</h3>
       <div class="table-wrap">
         <table id="table-pax">
           <thead>
             <tr>
-              <th>نوع الراكب</th>
-              <th>رقم الكود</th>
-              <th style="width:120px;text-align:center">إجراءات</th>
+              <th>Passenger type</th>
+              <th>Code</th>
+              <th style="width:120px;text-align:center">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="3" style="text-align:center;color:var(--muted)">جاري التحميل...</td></tr>
+            <tr><td colspan="3" style="text-align:center;color:var(--muted)">Loading...</td></tr>
           </tbody>
         </table>
       </div>
@@ -605,12 +603,12 @@ try {
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
   $('db-status').className = 'badge badge-ok';
-  $('db-status').textContent = 'متصل بالسحابة 🟢';
+  $('db-status').textContent = 'Connected 🟢';
 } catch (e) {
   console.error(e);
   $('db-status').className = 'badge badge-bad';
-  $('db-status').textContent = 'خطأ في الاتصال 🔴';
-  showToast('فشل الاتصال بـ Firebase', true);
+  $('db-status').textContent = 'Connection error 🔴';
+  showToast('Could not connect to Firebase', true);
 }
 
 // ----------------- Tabs Switching -----------------
@@ -648,10 +646,10 @@ function renderLegsTable(filterText = '') {
   const q = filterText.trim().toUpperCase();
   const filtered = q ? entries.filter(([k, v]) => (v.label || k).toUpperCase().includes(q) || String(v.code).includes(q)) : entries;
 
-  $('legs-count').textContent = `${entries.length} مسار مسجل (المعروض: ${filtered.length})`;
+  $('legs-count').textContent = `${entries.length} legs (showing ${filtered.length})`;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted)">لا توجد مسارات مطابقة</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted)">No matching legs</td></tr>`;
     return;
   }
 
@@ -664,8 +662,8 @@ function renderLegsTable(filterText = '') {
         <td><span style="direction:ltr;display:inline-block">${lbl}</span></td>
         <td><span class="code-tag">${code}</span></td>
         <td style="text-align:center">
-          <button class="btn btn-outline btn-sm btn-edit-leg" data-key="${key}">تعديل</button>
-          <button class="btn btn-danger btn-sm btn-del-leg" data-key="${key}">حذف</button>
+          <button class="btn btn-outline btn-sm btn-edit-leg" data-key="${key}">Edit</button>
+          <button class="btn btn-danger btn-sm btn-del-leg" data-key="${key}">Delete</button>
         </td>
       </tr>
     `;
@@ -685,17 +683,17 @@ $('form-add-leg').addEventListener('submit', async e => {
   if (!k || isNaN(code)) return;
 
   $('btn-add-leg').disabled = true;
-  $('btn-add-leg').textContent = 'جاري الحفظ...';
+  $('btn-add-leg').textContent = 'Saving...';
 
   try {
     await set(ref(db, `reference/leg/${k}`), { label: lbl, code });
-    showToast(`تمت إضافة المسار ${k} بنجاح ✅`);
+    showToast(`Leg ${k} added ✅`);
     $('form-add-leg').reset();
   } catch (err) {
-    showToast('حدث خطأ أثناء الحفظ: ' + err.message, true);
+    showToast('Save failed: ' + err.message, true);
   } finally {
     $('btn-add-leg').disabled = false;
-    $('btn-add-leg').textContent = '💾 إضافة المسار';
+    $('btn-add-leg').textContent = '💾 Add leg';
   }
 });
 const $legCode = $('leg-code');
@@ -705,12 +703,12 @@ $('table-legs').addEventListener('click', async e => {
   const btnDel = e.target.closest('.btn-del-leg');
   if (btnDel) {
     const k = btnDel.dataset.key;
-    if (confirm(`هل أنت متأكد من حذف المسار (${k})؟`)) {
+    if (confirm(`Delete leg ${k}?`)) {
       try {
         await remove(ref(db, `reference/leg/${k}`));
-        showToast(`تم حذف المسار ${k} بنجاح`);
+        showToast(`Leg ${k} deleted`);
       } catch (err) {
-        showToast('فشل الحذف: ' + err.message, true);
+        showToast('Delete failed: ' + err.message, true);
       }
     }
     return;
@@ -721,18 +719,18 @@ $('table-legs').addEventListener('click', async e => {
     const k = btnEdit.dataset.key;
     const cur = rawLegs[k];
     if (!cur) return;
-    const newLbl = prompt(`تعديل اسم العرض للمسار (${k}):`, cur.label || k);
+    const newLbl = prompt(`Edit label for leg ${k}:`, cur.label || k);
     if (newLbl === null) return;
-    const newCodeStr = prompt(`تعديل رقم الكود للمسار (${k}):`, cur.code);
+    const newCodeStr = prompt(`Edit code for leg ${k}:`, cur.code);
     if (newCodeStr === null) return;
     const newCode = parseInt(newCodeStr, 10);
-    if (isNaN(newCode)) { alert('رقم الكود غير صالح'); return; }
+    if (isNaN(newCode)) { alert('Invalid code'); return; }
 
     try {
       await update(ref(db, `reference/leg/${k}`), { label: newLbl.trim() || k, code: newCode });
-      showToast(`تم تحديث المسار ${k} بنجاح`);
+      showToast(`Leg ${k} updated`);
     } catch (err) {
-      showToast('فشل التحديث: ' + err.message, true);
+      showToast('Update failed: ' + err.message, true);
     }
   }
 });
@@ -752,10 +750,10 @@ function renderFaresTable(filterText = '') {
   const q = filterText.trim().toUpperCase();
   const filtered = q ? entries.filter(([k, v]) => (v.label || k).toUpperCase().includes(q) || String(v.code).includes(q)) : entries;
 
-  $('fares-count').textContent = `${entries.length} فئة مسجلة (المعروض: ${filtered.length})`;
+  $('fares-count').textContent = `${entries.length} fare classes (showing ${filtered.length})`;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted)">لا توجد فئات مطابقة</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted)">No matching fare classes</td></tr>`;
     return;
   }
 
@@ -767,8 +765,8 @@ function renderFaresTable(filterText = '') {
         <td><strong style="direction:ltr;display:inline-block">${lbl}</strong></td>
         <td><span class="code-tag">${code}</span></td>
         <td style="text-align:center">
-          <button class="btn btn-outline btn-sm btn-edit-fare" data-key="${key}">تعديل</button>
-          <button class="btn btn-danger btn-sm btn-del-fare" data-key="${key}">حذف</button>
+          <button class="btn btn-outline btn-sm btn-edit-fare" data-key="${key}">Edit</button>
+          <button class="btn btn-danger btn-sm btn-del-fare" data-key="${key}">Delete</button>
         </td>
       </tr>
     `;
@@ -788,10 +786,10 @@ $('form-add-fare').addEventListener('submit', async e => {
   $('btn-add-fare').disabled = true;
   try {
     await set(ref(db, `reference/fare/${k}`), { label: rawLbl, code });
-    showToast(`تمت إضافة الفئة بنجاح ✅`);
+    showToast(`Fare class added ✅`);
     $('form-add-fare').reset();
   } catch (err) {
-    showToast('حدث خطأ: ' + err.message, true);
+    showToast('Error: ' + err.message, true);
   } finally {
     $('btn-add-fare').disabled = false;
   }
@@ -802,12 +800,12 @@ $('table-fares').addEventListener('click', async e => {
   const btnDel = e.target.closest('.btn-del-fare');
   if (btnDel) {
     const k = btnDel.dataset.key;
-    if (confirm(`حذف الفئة (${k})؟`)) {
+    if (confirm(`Delete fare class ${k}?`)) {
       try {
         await remove(ref(db, `reference/fare/${k}`));
-        showToast('تم الحذف بنجاح');
+        showToast('Deleted');
       } catch (err) {
-        showToast('فشل الحذف: ' + err.message, true);
+        showToast('Delete failed: ' + err.message, true);
       }
     }
     return;
@@ -817,16 +815,16 @@ $('table-fares').addEventListener('click', async e => {
     const k = btnEdit.dataset.key;
     const cur = rawFares[k];
     if (!cur) return;
-    const newLbl = prompt(`تعديل اسم الفئة:`, cur.label || k);
+    const newLbl = prompt(`Edit fare class label:`, cur.label || k);
     if (!newLbl) return;
-    const newCode = parseInt(prompt(`تعديل رقم الكود:`, cur.code), 10);
+    const newCode = parseInt(prompt(`Edit code:`, cur.code), 10);
     if (isNaN(newCode)) return;
 
     try {
       await update(ref(db, `reference/fare/${k}`), { label: newLbl.trim(), code: newCode });
-      showToast('تم التحديث بنجاح');
+      showToast('Updated');
     } catch (err) {
-      showToast('فشل التحديث: ' + err.message, true);
+      showToast('Update failed: ' + err.message, true);
     }
   }
 });
@@ -837,7 +835,7 @@ const DEFAULT_AGREEMENT = [
   {name:'EBB / JUB / MCT / DOH / KWI', dests:['EBB','JUB','MCT','DOH','KWI'], out:{USD:[50,75,75]}, in:{USD:[50,75,75]}},
   {name:'JED / RUH / TUU / ELQ / AHB / DMM / TIF / MED', dests:['JED','RUH','TUU','ELQ','AHB','DMM','TIF','MED'], out:{USD:[30,50,75]}, in:{USD:[25,40,75]}},
   {name:'ADD / ASM', dests:['ADD','ASM'], out:{USD:[30,50,75]}, in:{USD:[25,40,75]}},
-  {name:'Domestic (الداخلي)', dests:['Domestic'], out:{USD:[20,35,50]}, in:{USD:[20,35,50]}}
+  {name:'Domestic', dests:['Domestic'], out:{USD:[20,35,50]}, in:{USD:[20,35,50]}}
 ];
 
 function initAgreementListener() {
@@ -857,18 +855,18 @@ function renderAgreement() {
     return `
       <div class="agr-card" data-idx="${idx}">
         <h4>${grp.name}</h4>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">الوجهات: ${grp.dests.join(' / ')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Destinations: ${grp.dests.join(' / ')}</div>
         <div style="display:grid;grid-template-columns:78px repeat(3, minmax(0, 1fr));gap:6px;font-weight:600;font-size:11px;color:var(--muted);text-align:center;margin-bottom:4px">
-          <div>الاتجاه</div><div>تعديل</div><div>استرجاع</div><div>No-Show</div>
+          <div>Direction</div><div>Modification</div><div>Refund</div><div>No-Show</div>
         </div>
         <div class="pen-row">
-          <label>خارجي (Out):</label>
+          <label>Outbound:</label>
           <input type="number" class="agr-in" data-idx="${idx}" data-dir="out" data-f="0" value="${outV[0]}">
           <input type="number" class="agr-in" data-idx="${idx}" data-dir="out" data-f="1" value="${outV[1]}">
           <input type="number" class="agr-in" data-idx="${idx}" data-dir="out" data-f="2" value="${outV[2]}">
         </div>
         <div class="pen-row">
-          <label>داخلي (In):</label>
+          <label>Inbound:</label>
           <input type="number" class="agr-in" data-idx="${idx}" data-dir="in" data-f="0" value="${inV[0]}">
           <input type="number" class="agr-in" data-idx="${idx}" data-dir="in" data-f="1" value="${inV[1]}">
           <input type="number" class="agr-in" data-idx="${idx}" data-dir="in" data-f="2" value="${inV[2]}">
@@ -893,9 +891,9 @@ $('btn-save-agreement').addEventListener('click', async () => {
   $('btn-save-agreement').disabled = true;
   try {
     await set(ref(db, 'reference/agreement'), rawAgreement);
-    showToast('تم حفظ تغييرات الاتفاقية في Firebase بنجاح! ✅');
+    showToast('Agreement saved ✅');
   } catch (err) {
-    showToast('فشل حفظ الاتفاقية: ' + err.message, true);
+    showToast('Could not save agreement: ' + err.message, true);
   } finally {
     $('btn-save-agreement').disabled = false;
   }
@@ -907,7 +905,7 @@ function initCloudIdsListener() {
   onValue(r, snap => {
     const val = snap.val();
     if (!val) {
-      $('cloud-ids-info').innerHTML = `⚠️ لا توجد IDs محفوظة في السحابة حالياً. جميع الصفوف في التطبيق ستعتبر <strong>Add</strong>.`;
+      $('cloud-ids-info').innerHTML = `⚠️ No IDs are stored in the cloud yet. Every row in the app will be <strong>Add</strong>.`;
       $('btn-clear-cloud-ids').style.display = 'none';
       return;
     }
@@ -922,12 +920,12 @@ function initCloudIdsListener() {
     }
 
     const meta = val.meta || {};
-    const dateStr = meta.updated ? new Date(meta.updated).toLocaleString('ar-EG') : 'غير محدد';
+    const dateStr = meta.updated ? new Date(meta.updated).toLocaleString('en-GB') : 'Unknown';
     $('cloud-ids-info').innerHTML = `
       <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
-        <div>المصدر: <strong>${meta.name || 'ملف مستورد'}</strong></div>
-        <div>إجمالي الغرامات المحفوظة: <strong class="stats-num">${count.toLocaleString()}</strong> غرامة</div>
-        <div>آخر تحديث: <span style="direction:ltr;display:inline-block">${dateStr}</span></div>
+        <div>Source: <strong>${meta.name || 'Imported file'}</strong></div>
+        <div>Penalties stored: <strong class="stats-num">${count.toLocaleString()}</strong></div>
+        <div>Last updated: <span style="direction:ltr;display:inline-block">${dateStr}</span></div>
       </div>
     `;
     $('btn-clear-cloud-ids').style.display = 'inline-flex';
@@ -935,12 +933,12 @@ function initCloudIdsListener() {
 }
 
 $('btn-clear-cloud-ids').addEventListener('click', async () => {
-  if (confirm('هل أنت متأكد من مسح جميع الـ IDs من السحابة؟ سيتعين عليك استيراد ملف جديد لمطابقة الـ IDs.')) {
+  if (confirm('Delete all IDs from the cloud? You will need to import a new file to match IDs.')) {
     try {
       await remove(ref(db, 'existing'));
-      showToast('تم مسح الـ IDs من السحابة.');
+      showToast('IDs deleted from the cloud.');
     } catch(err) {
-      showToast('خطأ: ' + err.message, true);
+      showToast('Error: ' + err.message, true);
     }
   }
 });
@@ -971,13 +969,13 @@ async function handleExcelFile(file) {
   const progPct = $('prog-pct');
 
   progBox.style.display = 'block';
-  progTitle.textContent = 'جاري قراءة ملف الإكسل...';
+  progTitle.textContent = 'Reading Excel file...';
   progBar.style.width = '20%';
   progPct.textContent = '20%';
 
   try {
     const buf = await file.arrayBuffer();
-    progTitle.textContent = 'جاري تحليل شيت Penalties...';
+    progTitle.textContent = 'Parsing the Penalties sheet...';
     progBar.style.width = '40%';
     progPct.textContent = '40%';
 
@@ -989,7 +987,7 @@ async function handleExcelFile(file) {
 
     const need = ['ID','Farebasis','Leg','Passenger Type','Penalty Type','Application Type','Between(hours)','And(hours)','Before or After flight','Currency','Modification pen amount','Modification pen mode','Refund pen amount','Refund pen mode'];
     const miss = need.filter(n => ix(n) < 0);
-    if (miss.length) throw new Error('الأعمدة التالية مفقودة في الشيت: ' + miss.join(', '));
+    if (miss.length) throw new Error('Missing columns in the sheet: ' + miss.join(', '));
 
     const map = new Map();
     for (let i = 1; i < data.length; i++) {
@@ -1020,9 +1018,9 @@ async function handleExcelFile(file) {
       }
     }
 
-    if (!map.size) throw new Error('لم يتم العثور على أي صفوف تحتوي على ID صالحة في الملف!');
+    if (!map.size) throw new Error('No rows with a valid ID were found in the file.');
 
-    progTitle.textContent = `تم العثور على ${map.size} غرامة بـ IDs. جاري الرفع إلى Firebase...`;
+    progTitle.textContent = `Found ${map.size} penalties with IDs. Uploading to Firebase...`;
     progBar.style.width = '70%';
     progPct.textContent = '70%';
 
@@ -1047,8 +1045,8 @@ async function handleExcelFile(file) {
 
     progBar.style.width = '100%';
     progPct.textContent = '100%';
-    progTitle.textContent = `تم بنجاح! تم رفع ومزامنة ${pairs.length.toLocaleString()} غرامة مع السحابة.`;
-    showToast(`تم رفع ملف ${file.name} بنجاح! ✅`);
+    progTitle.textContent = `Done. ${pairs.length.toLocaleString()} penalties synced to the cloud.`;
+    showToast(`${file.name} uploaded ✅`);
 
     setTimeout(() => {
       progBox.style.display = 'none';
@@ -1057,7 +1055,7 @@ async function handleExcelFile(file) {
 
   } catch (err) {
     console.error(err);
-    progTitle.textContent = 'فشل الاستيراد: ' + err.message;
+    progTitle.textContent = 'Import failed: ' + err.message;
     progBar.style.background = 'var(--bad)';
     showToast(err.message, true);
   }
@@ -1076,7 +1074,7 @@ function renderPaxTable() {
   const tbody = $('table-pax').querySelector('tbody');
   const entries = Object.entries(rawPax).sort((a,b) => (a[1].code || 0) - (b[1].code || 0));
   if (!entries.length) {
-    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted)">لا توجد بيانات</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted)">No data</td></tr>`;
     return;
   }
   tbody.innerHTML = entries.map(([key, item]) => `
@@ -1084,8 +1082,8 @@ function renderPaxTable() {
       <td><strong style="direction:ltr;display:inline-block">${item.label || key}</strong></td>
       <td><span class="code-tag">${item.code ?? ''}</span></td>
       <td style="text-align:center">
-        <button class="btn btn-outline btn-sm btn-edit-pax" data-key="${key}">تعديل</button>
-        <button class="btn btn-danger btn-sm btn-del-pax" data-key="${key}">حذف</button>
+        <button class="btn btn-outline btn-sm btn-edit-pax" data-key="${key}">Edit</button>
+        <button class="btn btn-danger btn-sm btn-del-pax" data-key="${key}">Delete</button>
       </td>
     </tr>
   `).join('');
@@ -1100,10 +1098,10 @@ $('form-add-pax').addEventListener('submit', async e => {
   $('btn-add-pax').disabled = true;
   try {
     await set(ref(db, `reference/pax/${k}`), { label: lbl, code });
-    showToast('تمت إضافة نوع الراكب بنجاح ✅');
+    showToast('Passenger type added ✅');
     $('form-add-pax').reset();
   } catch (err) {
-    showToast('خطأ: ' + err.message, true);
+    showToast('Error: ' + err.message, true);
   } finally {
     $('btn-add-pax').disabled = false;
   }
@@ -1113,12 +1111,12 @@ $('table-pax').addEventListener('click', async e => {
   const btnDel = e.target.closest('.btn-del-pax');
   if (btnDel) {
     const k = btnDel.dataset.key;
-    if (confirm(`حذف (${k})؟`)) {
+    if (confirm(`Delete ${k}?`)) {
       try {
         await remove(ref(db, `reference/pax/${k}`));
-        showToast('تم الحذف بنجاح');
+        showToast('Deleted');
       } catch(err) {
-        showToast('خطأ: ' + err.message, true);
+        showToast('Error: ' + err.message, true);
       }
     }
     return;
@@ -1128,15 +1126,15 @@ $('table-pax').addEventListener('click', async e => {
     const k = btnEdit.dataset.key;
     const cur = rawPax[k];
     if (!cur) return;
-    const newLbl = prompt('اسم نوع الراكب:', cur.label || k);
+    const newLbl = prompt('Passenger type label:', cur.label || k);
     if (!newLbl) return;
-    const newCode = parseInt(prompt('رقم الكود:', cur.code), 10);
+    const newCode = parseInt(prompt('Code:', cur.code), 10);
     if (isNaN(newCode)) return;
     try {
       await update(ref(db, `reference/pax/${k}`), { label: newLbl.trim(), code: newCode });
-      showToast('تم التحديث بنجاح');
+      showToast('Updated');
     } catch(err) {
-      showToast('خطأ: ' + err.message, true);
+      showToast('Error: ' + err.message, true);
     }
   }
 });
