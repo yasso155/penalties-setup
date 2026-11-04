@@ -17,3 +17,15 @@ Built-in penalties: if `data/penalties.json` exists next to the page, it is load
 No build step and no backend: open `index.html` or host it on GitHub Pages. Reference codes are embedded in the page; currencies are set in `ENABLED_CURRENCIES`.
 
 Yaser Aljaali - ياسر الجعلي
+
+## Firebase setup (multi-user)
+
+1. In the [Firebase Console](https://console.firebase.google.com) create a project.
+2. **Authentication** > Sign-in method > enable **Email/Password**, then add your users under *Users*.
+3. **Firestore Database** > Create database (production mode), then paste `firestore.rules` in the *Rules* tab and publish.
+4. **Project settings** > *Your apps* > add a **Web app**, copy the config into `firebase-config.js`.
+5. **Authentication** > Settings > *Authorized domains* > add `yasso155.github.io`.
+6. Enable GitHub Pages for this repo (Settings > Pages > Deploy from branch `main`).
+
+Data layout: `existing/chunk-N` (shared penalty IDs and current values), `settings/main` (SDG rates), `drafts/{uid}` (each user's own selections and file).
+While `firebase-config.js` is empty the page works in local mode (browser storage only).
