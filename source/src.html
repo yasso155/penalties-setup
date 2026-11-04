@@ -273,6 +273,14 @@ window.rebuildCode = function(){
   for(const [k] of GROUPS) CODE[k]=new Map(REF[k].map(([l,c])=>[l,c]));
 };
 
+/* Old drafts stored fare names like "Y - Full Fare"; the real name is "Y-Y - Full Fare". Map them to the real name. */
+function fixFare(n){
+  if(CODE.fare.has(n))return n;
+  const m=/^([A-Za-z0-9]+) - (.+)$/.exec(n);
+  if(m){const c=m[1]+'-'+n;if(CODE.fare.has(c))return c;}
+  return n;
+}
+
 function fmtAmt(a){return Number.isInteger(a)?String(a):String(+a.toFixed(4));}
 
 /* pen: {Before:{mod:{amt,mode},ref:{amt,mode}}, After:{...}} */
@@ -283,7 +291,7 @@ function ruleRows(rule){
   if (rule.noshow) sets.push({ptype:'NoShow',bas:['Before'],from:0,to:0,get:()=>rule.noshow});
   for (const st of sets) for (const ba of st.bas){
     const p = st.get(ba);
-    for (const fare of rule.fares) for (const leg of rule.legs) for (const pax of PAX_WITH_PENALTY){
+    for (const fare of new Set(rule.fares.map(fixFare))) for (const leg of rule.legs) for (const pax of PAX_WITH_PENALTY){
       out.push({ptype:st.ptype,from:st.from,to:st.to,fare,leg,pax,ba,cur:rule.cur,
         modAmt:p.mod.amt,modMode:p.mod.mode,refAmt:p.ref.amt,refMode:p.ref.mode});
     }
@@ -460,7 +468,7 @@ const state={
 function load(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(!s)return;
-    if(Array.isArray(s.fares))state.fares=new Set(s.fares.filter(x=>CODE.fare.has(x)));
+    if(Array.isArray(s.fares))state.fares=new Set(s.fares.map(fixFare).filter(x=>CODE.fare.has(x)));
     if(Array.isArray(s.legs))state.legs=new Set(s.legs.filter(x=>CODE.leg.has(x)));
     if(s.pen&&s.pen.Before&&s.pen.After){state.pen=s.pen;for(const b of Object.keys(state.pen))for(const k of ['mod','ref'])if(state.pen[b]&&state.pen[b][k])state.pen[b][k].mode='Value';}
     if(ENABLED_CURRENCIES.includes(s.cur))state.cur=s.cur;
@@ -753,6 +761,6 @@ $('btn-export').addEventListener('click',async()=>{
 });
 refresh();loadBuiltin();
 /* Hooks for the optional cloud layer (cloud.js, standalone hosting only) */
-window.PenApp={state,refresh,drawPen,ensureNoShow,loadBuiltin,redrawPickers(){farePicker.redraw();legPicker.redraw();}};
+window.PenApp={state,fixFare,refresh,drawPen,ensureNoShow,loadBuiltin,redrawPickers(){farePicker.redraw();legPicker.redraw();}};
 document.dispatchEvent(new Event('penapp-ready'));
 </script>
