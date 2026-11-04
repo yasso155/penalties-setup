@@ -356,6 +356,18 @@ tr:hover td {
   font-size: 12px;
   text-align: center;
 }
+
+/* --- Tidy-up --- */
+.agr-grid { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
+.agr-card { min-width: 0; }
+.agr-card h4 { direction: ltr; text-align: right; }
+.pen-row { grid-template-columns: 78px repeat(3, minmax(0, 1fr)); }
+.pen-row input { width: 100%; min-width: 0; }
+.table-wrap { max-height: 62vh; overflow: auto; }
+th { position: sticky; top: 0; z-index: 1; }
+td strong, .code-tag { direction: ltr; unicode-bidi: plaintext; }
+.card-title + p { line-height: 1.7; }
+.nav-tabs { position: sticky; top: 67px; z-index: 40; background: var(--bg); padding-top: 4px; }
 </style>
 </head>
 <body>
@@ -648,7 +660,7 @@ function renderLegsTable(filterText = '') {
     const code = item.code ?? '';
     return `
       <tr data-key="${key}">
-        <td><strong>${key}</strong></td>
+        <td><strong style="direction:ltr;display:inline-block">${key}</strong></td>
         <td><span style="direction:ltr;display:inline-block">${lbl}</span></td>
         <td><span class="code-tag">${code}</span></td>
         <td style="text-align:center">
@@ -846,7 +858,7 @@ function renderAgreement() {
       <div class="agr-card" data-idx="${idx}">
         <h4>${grp.name}</h4>
         <div style="font-size:11px;color:var(--muted);margin-bottom:10px">الوجهات: ${grp.dests.join(' / ')}</div>
-        <div style="display:grid;grid-template-columns:80px repeat(3, 1fr);gap:6px;font-weight:600;font-size:11px;color:var(--muted);text-align:center;margin-bottom:4px">
+        <div style="display:grid;grid-template-columns:78px repeat(3, minmax(0, 1fr));gap:6px;font-weight:600;font-size:11px;color:var(--muted);text-align:center;margin-bottom:4px">
           <div>الاتجاه</div><div>تعديل</div><div>استرجاع</div><div>No-Show</div>
         </div>
         <div class="pen-row">
@@ -1139,3 +1151,4 @@ initPaxListener();
 </script>
 </body>
 </html>
+
