@@ -366,6 +366,15 @@ tr:hover td {
 th { position: sticky; top: 0; z-index: 1; }
 .card-title + p { line-height: 1.7; }
 .nav-tabs { position: sticky; top: 67px; z-index: 40; background: var(--bg); padding-top: 4px; }
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+.modal-bg.show { display: flex; }
+.modal { background: var(--surface); border-radius: 12px; padding: 20px; max-width: 480px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.25); }
+.modal h3 { margin: 0 0 8px; font-size: 17px; }
+.modal p { margin: 0; color: var(--muted); line-height: 1.6; }
+.modal .m-items { display: flex; flex-wrap: wrap; gap: 6px; max-height: 180px; overflow: auto; margin-top: 12px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fafbfc; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.stn-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.stn-row .form-group { width: 200px; }
 </style>
 </head>
 <body>
@@ -409,6 +418,18 @@ th { position: sticky; top: 0; z-index: 1; }
         </div>
         <button type="submit" class="btn btn-primary" id="btn-add-leg">💾 Add leg</button>
       </form>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">🗑️ Delete legs by station</h3>
+      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">Use this when a station is removed from the system (e.g. AMM). Enter the station code to list every leg that starts or ends there. Nothing is deleted until you confirm.</p>
+      <div class="stn-row">
+        <div class="form-group">
+          <label>Station code</label>
+          <input type="text" id="stn-code" maxlength="4" placeholder="e.g. AMM" style="direction:ltr;text-transform:uppercase">
+        </div>
+        <button type="button" class="btn btn-danger" id="btn-stn-delete">Find legs to delete</button>
+      </div>
     </div>
 
     <div class="card">
@@ -578,6 +599,17 @@ th { position: sticky; top: 0; z-index: 1; }
 
 </div>
 
+<div id="confirm-modal" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="cm-title">
+  <div class="modal">
+    <h3 id="cm-title"></h3>
+    <p id="cm-msg"></p>
+    <div id="cm-items" class="m-items" hidden></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline" id="cm-cancel">Cancel</button>
+      <button type="button" class="btn btn-danger" id="cm-ok">Delete</button>
+    </div>
+  </div>
+</div>
 <div id="toast" class="toast"></div>
 
 <!-- Firebase Modular Script -->
@@ -596,6 +628,32 @@ function showToast(msg, isBad=false){
 }
 
 const safeKey = s => String(s).replace(/[.#$[\]]/g, '_');
+
+// In-page confirmation dialog. Resolves true only when the user clicks the confirm button.
+function confirmDialog({ title, message, items = [], confirmText = 'Delete' }) {
+  return new Promise(resolve => {
+    const modal = $('confirm-modal'), ok = $('cm-ok'), cancel = $('cm-cancel'), box = $('cm-items');
+    $('cm-title').textContent = title;
+    $('cm-msg').textContent = message;
+    box.innerHTML = '';
+    items.forEach(t => { const c = document.createElement('span'); c.className = 'code-tag'; c.textContent = t; box.appendChild(c); });
+    box.hidden = !items.length;
+    ok.textContent = confirmText;
+    modal.classList.add('show');
+    cancel.focus();
+    const done = v => {
+      modal.classList.remove('show');
+      ok.removeEventListener('click', onOk); cancel.removeEventListener('click', onNo);
+      modal.removeEventListener('click', onBg); document.removeEventListener('keydown', onKey);
+      resolve(v);
+    };
+    const onOk = () => done(true), onNo = () => done(false);
+    const onBg = e => { if (e.target === modal) done(false); };
+    const onKey = e => { if (e.key === 'Escape') done(false); };
+    ok.addEventListener('click', onOk); cancel.addEventListener('click', onNo);
+    modal.addEventListener('click', onBg); document.addEventListener('keydown', onKey);
+  });
+}
 
 // Initialize Firebase
 let db = null;
@@ -672,6 +730,28 @@ function renderLegsTable(filterText = '') {
 
 $('search-legs').addEventListener('input', e => renderLegsTable(e.target.value));
 
+// Delete every leg that starts or ends at a station
+$('btn-stn-delete').addEventListener('click', async () => {
+  const code = $('stn-code').value.trim().toUpperCase();
+  if (!code) { showToast('Enter a station code first', true); return; }
+  const parts = (k, v) => `${k}-${v.label || ''}`.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+  const hits = Object.entries(rawLegs).filter(([k, v]) => parts(k, v).includes(code)).map(([k]) => k).sort();
+  if (!hits.length) { showToast(`No legs use station ${code}`, true); return; }
+  const ok = await confirmDialog({
+    title: `Delete ${hits.length} leg${hits.length === 1 ? '' : 's'} for ${code}`,
+    message: `These legs start or end at ${code} and will be removed from the reference list. This cannot be undone.`,
+    items: hits, confirmText: `Delete ${hits.length} leg${hits.length === 1 ? '' : 's'}`
+  });
+  if (!ok) return;
+  try {
+    await update(ref(db, 'reference/leg'), Object.fromEntries(hits.map(k => [k, null])));
+    showToast(`Deleted ${hits.length} leg${hits.length === 1 ? '' : 's'} for ${code} ✅`);
+    $('stn-code').value = '';
+  } catch (err) {
+    showToast('Delete failed: ' + err.message, true);
+  }
+});
+
 // Add Leg
 $('form-add-leg').addEventListener('submit', async e => {
   e.preventDefault();
@@ -703,7 +783,7 @@ $('table-legs').addEventListener('click', async e => {
   const btnDel = e.target.closest('.btn-del-leg');
   if (btnDel) {
     const k = btnDel.dataset.key;
-    if (confirm(`Delete leg ${k}?`)) {
+    if (await confirmDialog({ title: 'Delete leg', message: `Delete leg ${k}${rawLegs[k] && rawLegs[k].code !== undefined ? ' (code ' + rawLegs[k].code + ')' : ''}? This cannot be undone.` })) {
       try {
         await remove(ref(db, `reference/leg/${k}`));
         showToast(`Leg ${k} deleted`);
@@ -800,7 +880,7 @@ $('table-fares').addEventListener('click', async e => {
   const btnDel = e.target.closest('.btn-del-fare');
   if (btnDel) {
     const k = btnDel.dataset.key;
-    if (confirm(`Delete fare class ${k}?`)) {
+    if (await confirmDialog({ title: 'Delete fare class', message: `Delete fare class ${k}${rawFares[k] && rawFares[k].code !== undefined ? ' (code ' + rawFares[k].code + ')' : ''}? This cannot be undone.` })) {
       try {
         await remove(ref(db, `reference/fare/${k}`));
         showToast('Deleted');
@@ -933,7 +1013,7 @@ function initCloudIdsListener() {
 }
 
 $('btn-clear-cloud-ids').addEventListener('click', async () => {
-  if (confirm('Delete all IDs from the cloud? You will need to import a new file to match IDs.')) {
+  if (await confirmDialog({ title: 'Delete all IDs', message: 'Delete all IDs from the cloud? You will need to import a new file to match IDs. This cannot be undone.', confirmText: 'Delete all' })) {
     try {
       await remove(ref(db, 'existing'));
       showToast('IDs deleted from the cloud.');
@@ -1111,7 +1191,7 @@ $('table-pax').addEventListener('click', async e => {
   const btnDel = e.target.closest('.btn-del-pax');
   if (btnDel) {
     const k = btnDel.dataset.key;
-    if (confirm(`Delete ${k}?`)) {
+    if (await confirmDialog({ title: 'Delete passenger type', message: `Delete passenger type ${k}? This cannot be undone.` })) {
       try {
         await remove(ref(db, `reference/pax/${k}`));
         showToast('Deleted');
