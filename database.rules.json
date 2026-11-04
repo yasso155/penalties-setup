@@ -1,6 +1,22 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true
+    "reference": {
+      ".read": true,
+      ".write": true
+    },
+    "settings": {
+      ".read": true,
+      ".write": true
+    },
+    "existing": {
+      ".read": true,
+      ".write": true
+    },
+    "drafts": {
+      "$uid": {
+        ".read": true,
+        ".write": true
+      }
+    }
   }
 }

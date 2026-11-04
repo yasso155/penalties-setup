@@ -246,8 +246,10 @@ details.more[open]>summary{margin-bottom:6px}
 <script>
 /* ===== Core: reference codes, row generation, workbook (no DOM) ===== */
 const REF = /*REF_JSON*/null;
-const ENABLED_CURRENCIES = ['SDG','USD','AED','SAR','QAR','OMR','EGP','JOD','KWD'];   // add more codes from the reference list here
-const QUICK_FARES = [['S','S-S - Economy Class','Economy Class'],['H','H-H - High Fare','High Fare'],['Y','Y-Y - Full Fare','Full Fare'],['J','J-J - Business Class','Business Class']];
+// Expose globals so cloud.js can update them from Firebase reference/ node
+window.REF = REF;
+window.ENABLED_CURRENCIES = ['SDG','USD','AED','SAR','QAR','OMR','EGP','JOD','KWD'];   // add more codes from the reference list here
+window.QUICK_FARES = [['S','S-S - Economy Class','Economy Class'],['H','H-H - High Fare','High Fare'],['Y','Y-Y - Full Fare','Full Fare'],['J','J-J - Business Class','Business Class']];
 const PAX_WITH_PENALTY = ['Adult(s)','Child(ren)'];
 const FIXED = {atype:'By coupon'};
 const BA_ORDER = ['Before','After'];
@@ -261,6 +263,10 @@ const LOOKUP = {B:['A','action'],E:['D','fare'],G:['F','leg'],I:['H','pax'],K:['
 function colLetter(i){let s='';i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;}
 const CODE = {};
 for (const [k] of GROUPS) CODE[k] = new Map(REF[k].map(([l,c])=>[l,c]));
+// Allow cloud.js to rebuild CODE after updating REF
+window.rebuildCode = function(){
+  for(const [k] of GROUPS) CODE[k]=new Map(REF[k].map(([l,c])=>[l,c]));
+};
 
 function fmtAmt(a){return Number.isInteger(a)?String(a):String(+a.toFixed(4));}
 

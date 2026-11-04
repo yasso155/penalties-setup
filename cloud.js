@@ -1,7 +1,8 @@
 /* Penalties Setup - Firebase layer (Auth + Realtime Database). Loaded only on standalone hosting.
    Shared:  existing/chunk-NNN/json (penalty IDs and current values, 500 rows per chunk, stored as JSON text),
             existing/meta (name), settings (SDG rates)
-   Private: drafts/{uid}/json (the user's own selections and file batch) */
+   Private: drafts/{uid}/json (the user's own selections and file batch)
+   Reference: reference/{fare|leg|pax|cur} (editable lookup tables - replaces hardcoded REF) */
 import {firebaseConfig} from './firebase-config.js';
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -72,8 +73,61 @@ function start(){
   }
   const readVal=async p=>{const s=await get(R(p));return s.exists()?s.val():null;};
 
+  /* ---------- reference: load from Firebase and update REF in the app ---------- */
+  /**
+   * Converts the Firebase reference/{fare|leg|pax} object format:
+   *   { "KEY": { label: "...", code: N }, ... }
+   * back to the array format the app expects:
+   *   [["label", code], ...]
+   * sorted by code (ascending) to keep the same order as the original REF.
+   */
+  function refObjToArray(obj){
+    if(!obj)return null;
+    return Object.values(obj)
+      .sort((a,b)=>a.code-b.code)
+      .map(({label,code})=>[label,code]);
+  }
+
+  async function loadReference(){
+    try{
+      const refData=await readVal('reference');
+      if(!refData){console.info('No reference data in Firebase, using built-in REF.');return;}
+
+      // Patch window.REF (or P.REF depending on how app exposes it)
+      const appRef = window.REF || (P && P.REF);
+      if(!appRef){console.warn('REF not found on window or P — skipping reference update.');return;}
+
+      const fareArr = refObjToArray(refData.fare);
+      const legArr  = refObjToArray(refData.leg);
+      const paxArr  = refObjToArray(refData.pax);
+
+      let changed = false;
+      if(fareArr&&fareArr.length){appRef.fare=fareArr;changed=true;}
+      if(legArr&&legArr.length){appRef.leg=legArr;changed=true;}
+      if(paxArr&&paxArr.length){appRef.pax=paxArr;changed=true;}
+
+      // Enabled currencies from Firebase
+      if(refData.cur&&Array.isArray(refData.cur.enabled)&&window.ENABLED_CURRENCIES!==undefined){
+        window.ENABLED_CURRENCIES=refData.cur.enabled;changed=true;
+      }
+      // Quick fares from Firebase
+      if(refData.cur&&Array.isArray(refData.cur.quick_fares)&&window.QUICK_FARES!==undefined){
+        window.QUICK_FARES=refData.cur.quick_fares;changed=true;
+      }
+
+      if(changed){
+        // Rebuild the CODE lookup maps after updating REF
+        if(typeof window.rebuildCode==='function')window.rebuildCode();
+        console.info(`Reference loaded from Firebase: ${fareArr?.length||0} fares, ${legArr?.length||0} legs, ${paxArr?.length||0} pax types.`);
+      }
+    }catch(e){console.warn('loadReference failed, using built-in REF:',e);}
+  }
+
   /* ---------- load after login ---------- */
   async function loadAll(){
+    // Load reference data first (non-blocking: app works with built-in REF if this fails)
+    await loadReference();
+
     try{const d=await readVal('settings');if(d){
       if(d.sdgOut>0)P.state.sdgOut=d.sdgOut;if(d.sdgIn>0)P.state.sdgIn=d.sdgIn;}}catch(e){console.warn(e);}
     try{const o=await readVal('drafts/'+uid);if(o&&o.json){const d=JSON.parse(o.json);
@@ -104,6 +158,12 @@ function start(){
       if(!s.exists())return;const d=s.val();
       if((d.sdgOut>0&&d.sdgOut!==P.state.sdgOut)||(d.sdgIn>0&&d.sdgIn!==P.state.sdgIn)){
         applying=true;if(d.sdgOut>0)P.state.sdgOut=d.sdgOut;if(d.sdgIn>0)P.state.sdgIn=d.sdgIn;P.refresh();applying=false;}
+    }));
+    // Live reference updates (e.g. admin adds new leg/fare from console)
+    unsubs.push(onValue(R('reference'),async s=>{
+      if(!s.exists())return;
+      await loadReference();
+      P.refresh();
     }));
   }
 
