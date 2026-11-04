@@ -1424,7 +1424,8 @@ if (db && auth) {
   $('btn-signout').addEventListener('click', () => fullSignOut(auth));
   onAuthStateChanged(auth, async user => {
     if (!user) { currentUser = null; $('btn-signout').hidden = true; $('who-mail').textContent = ''; gate.showLogin(); return; }
-    const r = await resolveRole(db, user);
+    let r;
+    try { r = await resolveRole(db, user); } catch (e) { console.warn('role check failed', e); gate.showBlocked(user.email, 'error'); return; }
     if (r !== 'admin') { gate.showBlocked(user.email, r === 'pending' || r === 'disabled' ? r : 'noadmin'); return; }
     currentUser = user; gate.hide();
     $('btn-signout').hidden = false; $('who-mail').textContent = user.email || '';

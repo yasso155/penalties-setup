@@ -180,7 +180,8 @@ function start(){
     onAuthStateChanged(auth,async user=>{
       unsubs.forEach(u=>u());unsubs=[];
       if(!user){uid=null;role=null;applyRole('');who.hidden=true;gate.showLogin();return;}
-      const r=await resolveRole(db,user);
+      let r;
+      try{r=await resolveRole(db,user);}catch(e){console.warn('role check failed',e);uid=null;role=null;applyRole('');who.hidden=true;gate.showBlocked(user.email,'error');return;}
       if(r==='pending'||r==='disabled'){uid=null;role=null;applyRole('');who.hidden=true;gate.showBlocked(user.email,r);return;}
       if(enforceLocalOwner(user.uid)){location.reload();return;}   // different account than the one this browser last used
       uid=user.uid;role=r;applyRole(r);gate.hide();

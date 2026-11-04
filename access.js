@@ -96,7 +96,8 @@ export function mountLogin(auth,{title='Penalties Setup',subtitle=''}={}){
     const msg={
       pending:'Your account is waiting for approval. Ask an admin to give you access, then sign in again.',
       disabled:'Your account has been disabled. Contact an admin.',
-      noadmin:'This page is for admins only.'
+      noadmin:'This page is for admins only.',
+      error:'Could not check your access. If you just set this up, publish the new database rules in Firebase (Realtime Database > Rules), then sign in again.'
     }[state]||'No access.';
     ov.innerHTML=`<div class="lg-card"><h2>No access</h2><p>${email?email+' — ':''}${msg}</p>
       ${state==='noadmin'?'<button type="button" id="lg-back" class="primary">Back to app</button>':''}
