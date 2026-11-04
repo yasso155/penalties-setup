@@ -5,7 +5,8 @@
    Reference: reference/{fare|leg|pax|cur} (editable lookup tables - replaces hardcoded REF) */
 import {firebaseConfig} from './firebase-config.js';
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {mountLogin,resolveRole,applyRole,fullSignOut,enforceLocalOwner} from './access.js';
 import {getDatabase,ref,get,set,update,onValue}
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
@@ -13,41 +14,18 @@ if(!firebaseConfig.apiKey||!firebaseConfig.databaseURL){console.info('Firebase n
 else start();
 
 function start(){
-  const SKIP_AUTH = true; // Set to false to require Email/Password login
   const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app);
   const $=id=>document.getElementById(id);
-  let P=null,uid=null,unsubs=[];
+  let P=null,uid=null,role=null,unsubs=[];
+  const canWrite=()=>role==='admin'||role==='editor';   // viewers cannot change shared data
   const CHUNK=500;
 
-  /* ---------- login overlay ---------- */
-  const ov=document.createElement('div');
-  ov.id='login';
-  if(SKIP_AUTH)ov.hidden=true;
-  ov.innerHTML=`<form class="lg-card" autocomplete="on">
-    <h2>Sign in</h2><p>Penalties Setup</p>
-    <label>Email<input id="lg-email" type="email" autocomplete="username" required></label>
-    <label>Password<input id="lg-pass" type="password" autocomplete="current-password" required></label>
-    <div id="lg-err" role="alert"></div>
-    <button class="primary" type="submit">Sign in</button></form>`;
-  const css=document.createElement('style');
-  css.textContent=`#login{position:fixed;inset:0;z-index:100;background:var(--bg,#eef1f6);display:flex;align-items:center;justify-content:center;padding:16px}
-  #login[hidden]{display:none}
-  .lg-card{width:min(360px,100%);background:var(--surface,#fff);border:1px solid var(--line,#d8dde6);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:12px}
-  .lg-card h2{margin:0;font-size:20px}.lg-card p{margin:0 0 4px;color:var(--muted,#667)}
-  .lg-card label{display:flex;flex-direction:column;gap:4px;font-size:13px}
-  #lg-err{color:var(--bad,#b3261e);font-size:13px;min-height:1em}
-  #who{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted,#667)}
-  #who button{padding:2px 8px;font-size:12px}`;
-  document.head.appendChild(css);document.body.appendChild(ov);
-  ov.querySelector('form').addEventListener('submit',async e=>{
-    e.preventDefault();$('lg-err').textContent='';
-    try{await signInWithEmailAndPassword(auth,$('lg-email').value.trim(),$('lg-pass').value);}
-    catch(err){$('lg-err').textContent='Wrong email or password.';}
-  });
+  /* ---------- login + signed-in badge ---------- */
+  const gate=mountLogin(auth,{title:'Penalties Setup'});
   const who=document.createElement('div');who.id='who';who.hidden=true;
   who.innerHTML='<span id="who-mail"></span><button type="button" id="who-out">Sign out</button>';
   document.querySelector('.top').appendChild(who);
-  $('who-out').addEventListener('click',()=>signOut(auth));
+  $('who-out').addEventListener('click',()=>fullSignOut(auth));
 
   /* ---------- helpers ---------- */
   const R=p=>ref(db,p);
@@ -146,7 +124,7 @@ function start(){
     let ex={pairs:[],name:''};
     try{ex=parseExisting(await readVal('existing'));}catch(e){console.warn(e);}
     if(ex.pairs.length)applyExisting(ex);
-    else if(P.state.imported&&P.state.existing.size){await pushExisting();}   // first time: upload what this browser has
+    else if(canWrite()&&P.state.imported&&P.state.existing.size){await pushExisting();}   // first time: upload what this browser has
     ['Before','After','NoShow'].forEach(b=>P.drawPen(b));
     if(P.redrawPickers)P.redrawPickers();
     P.refresh();
@@ -181,7 +159,7 @@ function start(){
       await set(R('drafts/'+uid),{json:JSON.stringify({fares:[...s.fares],legs:[...s.legs],pen:s.pen,cur:s.cur,noshowOn:s.noshowOn,
         startId:s.startId,batch:s.batch}),updated:Date.now()});
       const sig=s.sdgOut+'|'+s.sdgIn;
-      if(sig!==lastSettings&&s.sdgOut>0&&s.sdgIn>0){lastSettings=sig;await update(R('settings'),{sdgOut:s.sdgOut,sdgIn:s.sdgIn,updated:Date.now()});}
+      if(canWrite()&&sig!==lastSettings&&s.sdgOut>0&&s.sdgIn>0){lastSettings=sig;await update(R('settings'),{sdgOut:s.sdgOut,sdgIn:s.sdgIn,updated:Date.now()});}
     }catch(e){console.warn('draft save failed',e);}
   }
   async function pushExisting(){
@@ -194,22 +172,19 @@ function start(){
   }
   window.PenHooks={
     onSave(){if(!uid||applying)return;clearTimeout(tDraft);tDraft=setTimeout(pushDraft,1200);},
-    onExisting(){if(!uid||applying)return;clearTimeout(tEx);tEx=setTimeout(pushExisting,800);}
+    onExisting(){if(!uid||applying||!canWrite())return;clearTimeout(tEx);tEx=setTimeout(pushExisting,800);}
   };
 
   /* ---------- auth state ---------- */
   function boot(){
-    if(SKIP_AUTH){
-      uid='shared';
-      ov.hidden=true;
-      who.hidden=true;
-      loadAll();
-      return;
-    }
     onAuthStateChanged(auth,async user=>{
       unsubs.forEach(u=>u());unsubs=[];
-      if(!user){uid=null;ov.hidden=false;who.hidden=true;return;}
-      uid=user.uid;ov.hidden=true;who.hidden=false;$('who-mail').textContent=user.email||'';
+      if(!user){uid=null;role=null;applyRole('');who.hidden=true;gate.showLogin();return;}
+      const r=await resolveRole(db,user);
+      if(r==='pending'||r==='disabled'){uid=null;role=null;applyRole('');who.hidden=true;gate.showBlocked(user.email,r);return;}
+      if(enforceLocalOwner(user.uid)){location.reload();return;}   // different account than the one this browser last used
+      uid=user.uid;role=r;applyRole(r);gate.hide();
+      who.hidden=false;$('who-mail').textContent=(user.email||'')+' · '+r;
       await loadAll();
     });
   }

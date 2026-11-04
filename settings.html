@@ -386,7 +386,11 @@ th { position: sticky; top: 0; z-index: 1; }
     </a>
     <h1>Settings &amp; Data Management</h1>
   </div>
-  <div id="db-status" class="badge badge-warn">Connecting to database...</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="who-mail" style="font-size:12px;color:var(--muted)"></span>
+    <div id="db-status" class="badge badge-warn">Connecting to database...</div>
+    <button type="button" class="btn btn-outline btn-sm" id="btn-signout" hidden>Sign out</button>
+  </div>
 </header>
 
 <div class="container">
@@ -396,6 +400,7 @@ th { position: sticky; top: 0; z-index: 1; }
     <button class="tab-btn" data-tab="tab-agreement">📜 Agreement</button>
     <button class="tab-btn" data-tab="tab-excel">📊 Import IDs</button>
     <button class="tab-btn" data-tab="tab-pax">👥 Passengers</button>
+    <button class="tab-btn" data-tab="tab-users">👤 Users</button>
   </nav>
 
   <!-- ================= Tab 1: Legs ================= -->
@@ -597,6 +602,58 @@ th { position: sticky; top: 0; z-index: 1; }
     </div>
   </div>
 
+  <!-- ================= Tab 6: Users ================= -->
+  <div id="tab-users" class="tab-panel">
+    <div class="card">
+      <h3 class="card-title">➕ Add user</h3>
+      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px;line-height:1.7">
+        Creates the account and emails the person a link to set their own password. Each user gets their own private session.<br>
+        <b>Admin</b>: everything, including Settings and Users. <b>Editor</b>: builds files, exports, imports IDs. <b>Viewer</b>: builds files and exports; cannot import IDs or change shared data.
+      </p>
+      <form id="form-add-user" class="form-grid">
+        <div class="form-group">
+          <label>Email*</label>
+          <input type="email" id="user-email" placeholder="name@company.com" required style="direction:ltr">
+        </div>
+        <div class="form-group">
+          <label>Role*</label>
+          <select id="user-role">
+            <option value="editor">Editor</option>
+            <option value="viewer">Viewer</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-add-user">✉️ Create user &amp; send link</button>
+      </form>
+    </div>
+
+    <div class="card" id="pending-card" hidden>
+      <h3 class="card-title">⏳ Waiting for approval</h3>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:13px">These people signed in but have no role yet (for example, accounts created in the Firebase Console).</p>
+      <div class="table-wrap">
+        <table id="table-pending">
+          <thead><tr><th>Email</th><th>Give role</th><th style="width:170px;text-align:center">Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">Users</h3>
+          <span id="users-count" style="font-size:12px;color:var(--muted)">0 users</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="table-users">
+          <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Added</th><th style="width:140px;text-align:center">Actions</th></tr></thead>
+          <tbody><tr><td colspan="5" style="text-align:center;color:var(--muted)">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div id="confirm-modal" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="cm-title">
@@ -615,7 +672,9 @@ th { position: sticky; top: 0; z-index: 1; }
 <!-- Firebase Modular Script -->
 <script type="module">
 import {firebaseConfig} from './firebase-config.js';
-import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {getAuth, onAuthStateChanged, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {mountLogin, resolveRole, fullSignOut, ROLES} from './access.js';
 import {getDatabase, ref, get, set, update, remove, onValue} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
 const $ = id => document.getElementById(id);
@@ -656,10 +715,11 @@ function confirmDialog({ title, message, items = [], confirmText = 'Delete' }) {
 }
 
 // Initialize Firebase
-let db = null;
+let db = null, auth = null;
 try {
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
+  auth = getAuth(app);
   $('db-status').className = 'badge badge-ok';
   $('db-status').textContent = 'Connected 🟢';
 } catch (e) {
@@ -1220,11 +1280,157 @@ $('table-pax').addEventListener('click', async e => {
 });
 
 // Start listeners
-initLegsListener();
-initFaresListener();
-initAgreementListener();
-initCloudIdsListener();
-initPaxListener();
+// ----------------- Users (admin only) -----------------
+let rawUsers = {}, rawPending = {}, currentUser = null;
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ROLE_LABEL = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' };
+const roleOptions = sel => ROLES.map(r => `<option value="${r}"${r === sel ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('');
+
+function initUsersListener() {
+  onValue(ref(db, 'users'), snap => { rawUsers = snap.val() || {}; renderUsers(); });
+  onValue(ref(db, 'pending'), snap => { rawPending = snap.val() || {}; renderPending(); });
+}
+
+function renderUsers() {
+  const tbody = $('table-users').querySelector('tbody');
+  const entries = Object.entries(rawUsers).sort((a, b) => String(a[1].email).localeCompare(String(b[1].email)));
+  $('users-count').textContent = `${entries.length} user${entries.length === 1 ? '' : 's'}`;
+  if (!entries.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">No users</td></tr>'; return; }
+  tbody.innerHTML = entries.map(([uid, u]) => {
+    const self = currentUser && uid === currentUser.uid, off = u.role === 'disabled';
+    const d = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-GB') : '';
+    return `<tr>
+      <td><strong style="direction:ltr;display:inline-block">${esc(u.email)}</strong>${self ? ' <span class="badge badge-ok">You</span>' : ''}</td>
+      <td>${off ? '—' : `<select class="user-role-sel" data-uid="${esc(uid)}"${self ? ' disabled' : ''}>${roleOptions(u.role)}</select>`}</td>
+      <td>${off ? '<span class="badge badge-bad">Disabled</span>' : '<span class="badge badge-ok">Active</span>'}</td>
+      <td>${esc(d)}</td>
+      <td style="text-align:center">${self ? '' : off
+        ? `<button class="btn btn-outline btn-sm btn-user-enable" data-uid="${esc(uid)}">Enable</button>`
+        : `<button class="btn btn-danger btn-sm btn-user-disable" data-uid="${esc(uid)}">Disable</button>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPending() {
+  const entries = Object.entries(rawPending).sort((a, b) => String(a[1].email).localeCompare(String(b[1].email)));
+  $('pending-card').hidden = !entries.length;
+  $('table-pending').querySelector('tbody').innerHTML = entries.map(([uid, u]) => `<tr>
+      <td><strong style="direction:ltr;display:inline-block">${esc(u.email)}</strong></td>
+      <td><select class="pending-role-sel" data-uid="${esc(uid)}">${roleOptions('viewer')}</select></td>
+      <td style="text-align:center">
+        <button class="btn btn-primary btn-sm btn-pending-ok" data-uid="${esc(uid)}">Approve</button>
+        <button class="btn btn-outline btn-sm btn-pending-no" data-uid="${esc(uid)}">Dismiss</button>
+      </td></tr>`).join('');
+}
+
+const adminsExcept = uid => Object.entries(rawUsers).filter(([k, u]) => k !== uid && u.role === 'admin').length;
+
+$('table-users').addEventListener('change', async e => {
+  const sel = e.target.closest('.user-role-sel'); if (!sel) return;
+  const uid = sel.dataset.uid, u = rawUsers[uid]; if (!u) return;
+  if (u.role === 'admin' && sel.value !== 'admin' && adminsExcept(uid) < 1) {
+    showToast('At least one admin must remain', true); renderUsers(); return;
+  }
+  try { await update(ref(db, 'users/' + uid), { role: sel.value }); showToast(`${u.email} is now ${ROLE_LABEL[sel.value]}`); }
+  catch (err) { showToast('Update failed: ' + err.message, true); renderUsers(); }
+});
+
+$('table-users').addEventListener('click', async e => {
+  const off = e.target.closest('.btn-user-disable'), on = e.target.closest('.btn-user-enable');
+  if (off) {
+    const uid = off.dataset.uid, u = rawUsers[uid]; if (!u) return;
+    if (u.role === 'admin' && adminsExcept(uid) < 1) { showToast('At least one admin must remain', true); return; }
+    if (!await confirmDialog({ title: 'Disable user', message: `${u.email} will no longer be able to use the app. You can enable them again later.`, confirmText: 'Disable' })) return;
+    try { await update(ref(db, 'users/' + uid), { role: 'disabled', prevRole: u.role }); showToast(`${u.email} disabled`); }
+    catch (err) { showToast('Update failed: ' + err.message, true); }
+  }
+  if (on) {
+    const uid = on.dataset.uid, u = rawUsers[uid]; if (!u) return;
+    try { await update(ref(db, 'users/' + uid), { role: ROLES.includes(u.prevRole) ? u.prevRole : 'viewer', prevRole: null }); showToast(`${u.email} enabled`); }
+    catch (err) { showToast('Update failed: ' + err.message, true); }
+  }
+});
+
+$('table-pending').addEventListener('click', async e => {
+  const ok = e.target.closest('.btn-pending-ok'), no = e.target.closest('.btn-pending-no');
+  const btn = ok || no; if (!btn) return;
+  const uid = btn.dataset.uid, p = rawPending[uid]; if (!p) return;
+  try {
+    if (ok) {
+      const role = $('table-pending').querySelector(`.pending-role-sel[data-uid="${uid}"]`).value;
+      await set(ref(db, 'users/' + uid), { email: p.email, role, createdAt: Date.now(), createdBy: currentUser.email });
+      await remove(ref(db, 'pending/' + uid));
+      showToast(`${p.email} approved as ${ROLE_LABEL[role]}`);
+    } else {
+      if (!await confirmDialog({ title: 'Dismiss request', message: `Remove ${p.email} from the waiting list? They will appear again if they sign in again.`, confirmText: 'Dismiss' })) return;
+      await remove(ref(db, 'pending/' + uid));
+    }
+  } catch (err) { showToast('Failed: ' + err.message, true); }
+});
+
+function randomPassword() {
+  const a = new Uint8Array(24); crypto.getRandomValues(a);
+  return btoa(String.fromCharCode(...a)).replace(/[^A-Za-z0-9]/g, '').slice(0, 20) + 'aA1!';
+}
+
+// Creating an account signs the new user in, so it runs on a second Firebase app and leaves the admin signed in here.
+async function createAuthUser(email) {
+  const sec = getApps().find(a => a.name === 'secondary') || initializeApp(firebaseConfig, 'secondary');
+  const sAuth = getAuth(sec);
+  try {
+    const cred = await createUserWithEmailAndPassword(sAuth, email, randomPassword());
+    return { uid: cred.user.uid, sAuth };
+  } catch (err) { throw err; }
+}
+
+$('form-add-user').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('user-email').value.trim().toLowerCase(), role = $('user-role').value;
+  if (!email) return;
+  if (Object.values(rawUsers).some(u => String(u.email).toLowerCase() === email)) { showToast('This email is already a user', true); return; }
+  $('btn-add-user').disabled = true;
+  let sAuth = null;
+  try {
+    const made = await createAuthUser(email); sAuth = made.sAuth;
+    await set(ref(db, 'users/' + made.uid), { email, role, createdAt: Date.now(), createdBy: currentUser.email });
+    let mailed = true;
+    try { await sendPasswordResetEmail(sAuth, email); } catch (err) { mailed = false; }
+    showToast(mailed ? `${email} created. A link to set their password was sent ✅` : `${email} created, but the email could not be sent. Use "Forgot password" on the sign-in page.`, !mailed);
+    $('form-add-user').reset();
+  } catch (err) {
+    const code = err && err.code;
+    if (code === 'auth/email-already-in-use') showToast('This email already has an account. Ask them to sign in once; they will appear under "Waiting for approval".', true);
+    else if (code === 'auth/invalid-email') showToast('Invalid email address', true);
+    else showToast('Could not create user: ' + (err.message || code), true);
+  } finally {
+    if (sAuth) { try { await signOut(sAuth); } catch (e) {} }
+    $('btn-add-user').disabled = false;
+  }
+});
+
+// ----------------- Access gate: sign in, admins only -----------------
+let started = false;
+function startApp() {
+  if (started) return; started = true;
+  initLegsListener();
+  initFaresListener();
+  initAgreementListener();
+  initCloudIdsListener();
+  initPaxListener();
+  initUsersListener();
+}
+if (db && auth) {
+  const gate = mountLogin(auth, { title: 'Penalties Setup', subtitle: 'Settings' });
+  $('btn-signout').addEventListener('click', () => fullSignOut(auth));
+  onAuthStateChanged(auth, async user => {
+    if (!user) { currentUser = null; $('btn-signout').hidden = true; $('who-mail').textContent = ''; gate.showLogin(); return; }
+    const r = await resolveRole(db, user);
+    if (r !== 'admin') { gate.showBlocked(user.email, r === 'pending' || r === 'disabled' ? r : 'noadmin'); return; }
+    currentUser = user; gate.hide();
+    $('btn-signout').hidden = false; $('who-mail').textContent = user.email || '';
+    startApp();
+  });
+}
 
 </script>
 </body>

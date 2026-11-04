@@ -21,11 +21,18 @@ Yaser Aljaali - ياسر الجعلي
 ## Firebase setup (multi-user, Realtime Database)
 
 1. Firebase project: `penalties-setup`, with a Realtime Database.
-2. **Authentication** > Sign-in method > enable **Email/Password**, then add your users under *Users*.
-3. **Realtime Database** > *Rules* > paste `database.rules.json` and publish.
-4. **Project settings** > *Your apps* > Web app > copy the config into `firebase-config.js` (it must include `databaseURL`).
-5. **Authentication** > Settings > *Authorized domains* > add `yasso155.github.io`.
-6. Enable GitHub Pages (Settings > Pages > Deploy from branch `main`).
+2. **Authentication** > Sign-in method > enable **Email/Password**.
+3. **Authentication** > Settings > *Authorized domains* > add your hosting domain (for example `penalties-setup.vercel.app`).
+4. **Realtime Database** > *Rules* > paste `database.rules.json` and **Publish**. Publish it right after the new site version is deployed.
+5. **First admin**: make sure `yseddig15@gmail.com` exists under Authentication > Users (add it there if not), then open the site and sign in with it. While no users exist, that account becomes Admin automatically (the email is set in `access.js` and in `database.rules.json`).
 
-Data layout: `existing` (shared penalty IDs and current values), `settings` (SDG rates), `drafts/{uid}` (each user's own selections and file).
+Roles (stored at `users/{uid}/role`):
+- **Admin**: everything, including Settings and Users.
+- **Editor**: builds files, exports, imports IDs and changes the shared penalty table.
+- **Viewer**: builds files and exports; cannot import IDs.
+- **Disabled**: signed in but blocked.
+
+Add users in **Settings > Users**: enter an email and a role; the person gets an email with a link to set their own password. Anyone who signs in without a role (for example an account made in the Firebase Console) shows under "Waiting for approval" until an admin gives them a role. Disabling a user blocks them in the app; deleting the sign-in account itself is done in the Firebase Console.
+
+Data layout: `users`, `pending`, `existing` (shared penalty IDs and current values), `settings` (SDG rates), `reference` (legs, fares, passengers, agreement; admin only), `drafts/{uid}` (each user's own selections and file, private).
 While `firebase-config.js` is empty the page works in local mode (browser storage only).
