@@ -112,7 +112,7 @@ function start(){
       }
       // Quick fares from Firebase
       if(refData.cur&&Array.isArray(refData.cur.quick_fares)&&window.QUICK_FARES!==undefined){
-        window.QUICK_FARES=refData.cur.quick_fares;changed=true;
+        {const known=new Set((fareArr||appRef.fare||[]).map(x=>x[0]));const q=refData.cur.quick_fares.filter(x=>known.has(x[1]));if(q.length){window.QUICK_FARES=q;changed=true;}}   // ignore labels that are not real fare names
       }
       // Agreement penalties from Firebase
       if(refData.agreement&&Array.isArray(refData.agreement)&&typeof window.updateAgreement==='function'){

@@ -43,10 +43,10 @@ for (const [label, code] of ref.pax) {
 payload.cur = {
   enabled: ['SDG','USD','AED','SAR','QAR','OMR','EGP','JOD','KWD'],
   quick_fares: [
-    ['S','S - Economy Class','Economy Class'],
-    ['H','H - High Fare','High Fare'],
-    ['Y','Y - Full Fare','Full Fare'],
-    ['J','J - Business Class','Business Class']
+    ['S','S-S - Economy Class','Economy Class'],
+    ['H','H-H - High Fare','High Fare'],
+    ['Y','Y-Y - Full Fare','Full Fare'],
+    ['J','J-J - Business Class','Business Class']
   ]
 };
 
