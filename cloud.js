@@ -12,6 +12,7 @@ if(!firebaseConfig.apiKey||!firebaseConfig.databaseURL){console.info('Firebase n
 else start();
 
 function start(){
+  const SKIP_AUTH = true; // Set to false to require Email/Password login
   const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app);
   const $=id=>document.getElementById(id);
   let P=null,uid=null,unsubs=[];
@@ -20,6 +21,7 @@ function start(){
   /* ---------- login overlay ---------- */
   const ov=document.createElement('div');
   ov.id='login';
+  if(SKIP_AUTH)ov.hidden=true;
   ov.innerHTML=`<form class="lg-card" autocomplete="on">
     <h2>Sign in</h2><p>Penalties Setup</p>
     <label>Email<input id="lg-email" type="email" autocomplete="username" required></label>
@@ -131,6 +133,13 @@ function start(){
 
   /* ---------- auth state ---------- */
   function boot(){
+    if(SKIP_AUTH){
+      uid='shared';
+      ov.hidden=true;
+      who.hidden=true;
+      loadAll();
+      return;
+    }
     onAuthStateChanged(auth,async user=>{
       unsubs.forEach(u=>u());unsubs=[];
       if(!user){uid=null;ov.hidden=false;who.hidden=true;return;}
