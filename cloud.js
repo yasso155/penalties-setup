@@ -114,6 +114,10 @@ function start(){
       if(refData.cur&&Array.isArray(refData.cur.quick_fares)&&window.QUICK_FARES!==undefined){
         window.QUICK_FARES=refData.cur.quick_fares;changed=true;
       }
+      // Agreement penalties from Firebase
+      if(refData.agreement&&Array.isArray(refData.agreement)&&typeof window.updateAgreement==='function'){
+        window.updateAgreement(refData.agreement);
+      }
 
       if(changed){
         // Rebuild the CODE lookup maps after updating REF

@@ -59,3 +59,4 @@ console.log(`  pax:  ${Object.keys(payload.pax).length} entries`);
 await db.ref('reference').set(payload);
 console.log('✅ Done! reference/ written to Firebase.');
 process.exit(0);
+

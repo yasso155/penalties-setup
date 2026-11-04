@@ -172,9 +172,14 @@ details.more[open]>summary{margin-bottom:6px}
     <div>
       <h1>Penalties Setup</h1>
     </div>
-    <div class="brand" role="img" aria-label="Yaser Aljaali - ياسر الجعلي">
-      <img class="brand-light" src="data:image/svg+xml;base64,/*LOGO_LIGHT*/" alt="">
-      <img class="brand-dark" src="data:image/svg+xml;base64,/*LOGO_DARK*/" alt="">
+    <div style="display:flex;align-items:center;gap:14px">
+      <a href="settings.html" class="settings-nav-btn" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:var(--surface,#fff);border:1px solid var(--line,#d8dde6);color:var(--text,#1b1f24);text-decoration:none;font-weight:600;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,0.05);transition:all 0.2s">
+        <span>⚙️</span> Settings / الإعدادات
+      </a>
+      <div class="brand" role="img" aria-label="Yaser Aljaali - ياسر الجعلي">
+        <img class="brand-light" src="data:image/svg+xml;base64,/*LOGO_LIGHT*/" alt="">
+        <img class="brand-dark" src="data:image/svg+xml;base64,/*LOGO_DARK*/" alt="">
+      </div>
     </div>
   </header>
 
@@ -373,7 +378,7 @@ function toXlsxBuffer(rows){return XLSX.write(buildWorkbook(rows),{bookType:'xls
 
 /* ===== Agreement (J4 / 3T, Winter 26): penalties by destination group =====
    Outbound = leg leaves KRT or PZU. Inbound = leg returns to KRT or PZU. Values: [Modify, Refund, No-show]. */
-const AGREEMENT=[
+let AGREEMENT=[
   {name:'CAI',dests:['CAI'],
    out:{USD:[30,50,75]}, in:{USD:[20,30,40]}},
   {name:'EBB / JUB / MCT / DOH / KWI',dests:['EBB','JUB','MCT','DOH','KWI'],
@@ -387,21 +392,33 @@ const AGREEMENT=[
 const AGREEMENT_DOMESTIC={name:'Domestic',vals:{USD:[20,35,50]},
   legs:['PZU-KRT','KRT-PZU','PZU-DOG','DOG-PZU','PZU-KSL','KSL-PZU','KRT-DOG','DOG-KRT','KRT-KSL','KSL-KRT']};
 const AGR_LEG=new Map();   // leg -> {group, dir, vals}
-for (const g of AGREEMENT) for (const d of g.dests) for (const o of ['KRT','PZU']){
-  for (const [leg,dir,vals] of [[`${o}-${d}`,'Outbound',g.out],[`${d}-${o}`,'Inbound',g.in]])
-    if (CODE.leg.has(leg)) AGR_LEG.set(leg,{group:g.name,dir,vals});
-}
-for (const leg of AGREEMENT_DOMESTIC.legs) if (CODE.leg.has(leg)) AGR_LEG.set(leg,{group:AGREEMENT_DOMESTIC.name,dir:'Both',vals:AGREEMENT_DOMESTIC.vals});
 
 /* Rates per 1 USD and rounding step per currency. Converted values are rounded DOWN to the step.
    Explicit agreement values (SAR, SDG for the JED group) take priority over conversion. */
 const RATES={EGP:[48,10],JOD:[0.7,0.5],SAR:[3.75,5],QAR:[3.65,5],OMR:[0.3846,0.5],AED:[3.67,5],KWD:[0.30303,0.5]};
 const SDG_STEP=1000;   // SDG rate is typed by the user, separately for Outbound and Inbound
 function convUSD(usd,cur){const [rate,step]=RATES[cur];return +(Math.floor(usd*rate/step+1e-9)*step).toFixed(4);}
-for (const a of AGR_LEG.values()){
-  const u=a.vals.USD; if(!u)continue;
-  for(const cur of Object.keys(RATES)) if(!a.vals[cur]) a.vals[cur]=u.map(x=>convUSD(x,cur));
+
+function rebuildAgreement(){
+  AGR_LEG.clear();
+  for (const g of AGREEMENT) for (const d of g.dests) for (const o of ['KRT','PZU']){
+    for (const [leg,dir,vals] of [[`${o}-${d}`,'Outbound',g.out],[`${d}-${o}`,'Inbound',g.in]])
+      if (CODE.leg && CODE.leg.has(leg)) AGR_LEG.set(leg,{group:g.name,dir,vals});
+  }
+  for (const leg of AGREEMENT_DOMESTIC.legs) if (CODE.leg && CODE.leg.has(leg)) AGR_LEG.set(leg,{group:AGREEMENT_DOMESTIC.name,dir:'Both',vals:AGREEMENT_DOMESTIC.vals});
+  for (const a of AGR_LEG.values()){
+    const u=a.vals.USD; if(!u)continue;
+    for(const cur of Object.keys(RATES)) if(!a.vals[cur]) a.vals[cur]=u.map(x=>convUSD(x,cur));
+  }
 }
+rebuildAgreement();
+window.updateAgreement = function(newAgr){
+  if(Array.isArray(newAgr)&&newAgr.length){
+    AGREEMENT = newAgr;
+    rebuildAgreement();
+    if(window.PenApp&&window.PenApp.refresh)window.PenApp.refresh();
+  }
+};
 /* Values of an agreement leg in a currency (SDG follows the typed rates; Both/domestic uses Outbound). */
 function agrVals(a,cur){
   if(cur==='SDG'){const u=a.vals.USD,rate=a.dir==='Inbound'?state.sdgIn:state.sdgOut;

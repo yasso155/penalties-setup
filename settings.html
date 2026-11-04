@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Penalties Setup — الإعدادات وإدارة البيانات</title>
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon.ico">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #f0f4f9;
+  --surface: #ffffff;
+  --line: #d8dde6;
+  --text: #1b1f24;
+  --muted: #57606a;
+  --primary: #0969da;
+  --primary-hover: #0856b3;
+  --bad: #cf222e;
+  --bad-bg: #ffebe9;
+  --ok: #1a7f37;
+  --ok-bg: #dafbe1;
+  --warn: #9a6700;
+  --warn-bg: #fff8c5;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #f3f7fe;
+  border: 1px solid #d0e1fd;
+  transition: all 0.2s;
+}
+.back-link:hover {
+  background: #e1edfe;
+}
+.badge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.badge-ok { background: var(--ok-bg); color: var(--ok); border: 1px solid #a8e5b6; }
+.badge-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #fae17d; }
+.badge-bad { background: var(--bad-bg); color: var(--bad); border: 1px solid #ffc1ba; }
+
+.container {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+.nav-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 10px 16px;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.tab-btn:hover {
+  color: var(--text);
+  background: rgba(0,0,0,0.03);
+}
+.tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: var(--surface);
+}
+.tab-panel {
+  display: none;
+}
+.tab-panel.active {
+  display: block;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  align-items: flex-end;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+input[type="text"], input[type="number"], select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fafbfc;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+input:focus, select:focus {
+  border-color: var(--primary);
+  background: #fff;
+}
+.btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+.btn-outline {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text);
+}
+.btn-outline:hover {
+  background: #f3f4f6;
+}
+.btn-danger {
+  background: var(--bad);
+  color: #fff;
+}
+.btn-danger:hover {
+  background: #a41923;
+}
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 14px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: right;
+}
+th {
+  background: #f6f8fa;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #eaeef2;
+  vertical-align: middle;
+}
+tr:last-child td {
+  border-bottom: none;
+}
+tr:hover td {
+  background: #fbfcfd;
+}
+.code-tag {
+  display: inline-block;
+  font-family: monospace;
+  background: #eef2ff;
+  color: #3b5998;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  background: #24292f;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  font-size: 13px;
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s;
+  pointer-events: none;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.upload-zone {
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  padding: 36px 20px;
+  text-align: center;
+  background: #fafbfc;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--primary);
+  background: #f0f6ff;
+}
+.upload-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(320px, 100%);
+}
+.search-bar input {
+  width: 100%;
+}
+.stats-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.agr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.agr-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fafbfc;
+}
+.agr-card h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--text);
+  border-bottom: 1px solid #e1e4e8;
+  padding-bottom: 6px;
+}
+.pen-row {
+  display: grid;
+  grid-template-columns: 80px repeat(3, 1fr);
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.pen-row label {
+  font-weight: 600;
+  color: var(--muted);
+}
+.pen-row input {
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-title">
+    <a href="index.html" class="back-link">
+      <span>→</span> العودة للتطبيق الرئيسي
+    </a>
+    <h1>إعدادات النظام وإدارة البيانات</h1>
+  </div>
+  <div id="db-status" class="badge badge-warn">جاري الاتصال بقاعدة البيانات...</div>
+</header>
+
+<div class="container">
+  <nav class="nav-tabs">
+    <button class="tab-btn active" data-tab="tab-legs">🛫 المسارات (Legs)</button>
+    <button class="tab-btn" data-tab="tab-fares">🎟️ الفئات (Farebasis)</button>
+    <button class="tab-btn" data-tab="tab-agreement">📜 الاتفاقية (Agreement)</button>
+    <button class="tab-btn" data-tab="tab-excel">📊 رفع ملف الـ IDs (Import)</button>
+    <button class="tab-btn" data-tab="tab-pax">👥 الركاب (Passengers)</button>
+  </nav>
+
+  <!-- ================= Tab 1: Legs ================= -->
+  <div id="tab-legs" class="tab-panel active">
+    <div class="card">
+      <h3 class="card-title">➕ إضافة مسار جديد (Add New Leg)</h3>
+      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">أدخل كود المسار من محطتين مثل (KRT-JED أو PZU-DXB) ورقم الـ Code الخاص به في نظام الحجز.</p>
+      <form id="form-add-leg" class="form-grid">
+        <div class="form-group">
+          <label>كود المسار (Leg Key)*</label>
+          <input type="text" id="leg-key" placeholder="مثال: KRT-DXB" required style="direction:ltr">
+        </div>
+        <div class="form-group">
+          <label>اسم العرض (Label - اختياري)</label>
+          <input type="text" id="leg-label" placeholder="نفس كود المسار إن ترك فارغاً" style="direction:ltr">
+        </div>
+        <div class="form-group">
+          <label>رقم الكود (Code ID)*</label>
+          <input type="number" id="leg-code" placeholder="مثال: 520" required min="1">
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-add-leg">💾 إضافة المسار</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">قائمة المسارات المسجلة</h3>
+          <span id="legs-count" style="font-size:12px;color:var(--muted)">0 مسار مسجل</span>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="search-legs" placeholder="🔍 بحث في المسارات...">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="table-legs">
+          <thead>
+            <tr>
+              <th>المسار (Key)</th>
+              <th>اسم العرض (Label)</th>
+              <th>رقم الكود (Code)</th>
+              <th style="width:120px;text-align:center">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="text-align:center;color:var(--muted)">جاري تحميل البيانات...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Tab 2: Fares ================= -->
+  <div id="tab-fares" class="tab-panel">
+    <div class="card">
+      <h3 class="card-title">➕ إضافة فئة تذكرة جديدة (Add Farebasis)</h3>
+      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">أدخل كود الفئة والدرجة (مثل Y-Y - Full Fare) ورقم الكود الخاص بها.</p>
+      <form id="form-add-fare" class="form-grid">
+        <div class="form-group">
+          <label>كود الفئة (Fare Key / Label)*</label>
+          <input type="text" id="fare-key" placeholder="مثال: S-S - Economy Class" required style="direction:ltr">
+        </div>
+        <div class="form-group">
+          <label>رقم الكود (Code ID)*</label>
+          <input type="number" id="fare-code" placeholder="مثال: 84" required min="1">
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-add-fare">💾 إضافة الفئة</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">قائمة فئات التذاكر</h3>
+          <span id="fares-count" style="font-size:12px;color:var(--muted)">0 فئة مسجلة</span>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="search-fares" placeholder="🔍 بحث في الفئات...">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="table-fares">
+          <thead>
+            <tr>
+              <th>كود الفئة (Label)</th>
+              <th>رقم الكود (Code)</th>
+              <th style="width:120px;text-align:center">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="text-align:center;color:var(--muted)">جاري تحميل البيانات...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Tab 3: Agreement ================= -->
+  <div id="tab-agreement" class="tab-panel">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">📜 اتفاقية غرامات الوجهات (Agreement Penalties)</h3>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px">قيم الغرامات الافتراضية لكل مجموعة وجهات بالدولار (USD). التعديل هنا يُحفظ في Firebase وينعكس على التطبيق.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="btn-save-agreement">💾 حفظ تغييرات الاتفاقية في السحابة</button>
+      </div>
+
+      <div class="agr-grid" id="agr-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Tab 4: Excel IDs Import ================= -->
+  <div id="tab-excel" class="tab-panel">
+    <div class="card">
+      <h3 class="card-title">📊 استيراد ورفع ملف الـ IDs (Penalties Export)</h3>
+      <p style="margin:4px 0 16px;color:var(--muted);font-size:13px">
+        ارفع شيت الإكسل التصديري السابق الذي يحتوي على عمود <b>ID</b>. سيقوم النظام بحفظ هذه الـ IDs في Firebase Realtime Database مباشرة تحت <code>existing/</code>، ليتمكن أي مستخدم يفتح التطبيق من مطابقة الغرامات وتوليد أمر Update بأرقام الـ IDs الأصلية.
+      </p>
+
+      <div class="upload-zone" id="drop-zone">
+        <div class="upload-icon">📁</div>
+        <div style="font-weight:600;font-size:15px;margin-bottom:4px">اسحب وأفلت ملف الإكسل هنا، أو اضغط للاختيار</div>
+        <div style="font-size:12px;color:var(--muted)">يدعم ملفات .xlsx و .xls (يجب أن يحتوي شيت Penalties على عمود ID)</div>
+        <input type="file" id="file-excel" accept=".xlsx,.xls" style="display:none">
+      </div>
+
+      <div id="import-progress" style="display:none;margin-top:20px;padding:16px;background:#f6f8fa;border-radius:8px;border:1px solid var(--line)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <strong id="prog-title">جاري قراءة الملف...</strong>
+          <span id="prog-pct" style="font-weight:600">0%</span>
+        </div>
+        <div style="height:8px;background:#e1e4e8;border-radius:4px;overflow:hidden">
+          <div id="prog-bar" style="width:0%;height:100%;background:var(--primary);transition:width 0.2s"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">حالة الـ IDs الحالية في السحابة</h3>
+          <div id="cloud-ids-info" style="margin-top:6px;font-size:13px;color:var(--muted)">جاري فحص قاعدة البيانات...</div>
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" id="btn-clear-cloud-ids" style="display:none">
+          🗑️ مسح جميع الـ IDs من السحابة
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Tab 5: Pax ================= -->
+  <div id="tab-pax" class="tab-panel">
+    <div class="card">
+      <h3 class="card-title">➕ إضافة نوع راكب جديد (Passenger Type)</h3>
+      <form id="form-add-pax" class="form-grid">
+        <div class="form-group">
+          <label>اسم نوع الراكب (Label)*</label>
+          <input type="text" id="pax-label" placeholder="مثال: Adult(s)" required style="direction:ltr">
+        </div>
+        <div class="form-group">
+          <label>رقم الكود (Code ID)*</label>
+          <input type="number" id="pax-code" placeholder="مثال: 1" required min="1">
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-add-pax">💾 إضافة</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">أنواع الركاب المسجلة</h3>
+      <div class="table-wrap">
+        <table id="table-pax">
+          <thead>
+            <tr>
+              <th>نوع الراكب</th>
+              <th>رقم الكود</th>
+              <th style="width:120px;text-align:center">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="text-align:center;color:var(--muted)">جاري التحميل...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- Firebase Modular Script -->
+<script type="module">
+import {firebaseConfig} from './firebase-config.js';
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {getDatabase, ref, get, set, update, remove, onValue} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+
+const $ = id => document.getElementById(id);
+const toast = $('toast');
+function showToast(msg, isBad=false){
+  toast.textContent = msg;
+  toast.style.background = isBad ? 'var(--bad)' : '#24292f';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+const safeKey = s => String(s).replace(/[.#$[\]]/g, '_');
+
+// Initialize Firebase
+let db = null;
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  $('db-status').className = 'badge badge-ok';
+  $('db-status').textContent = 'متصل بالسحابة 🟢';
+} catch (e) {
+  console.error(e);
+  $('db-status').className = 'badge badge-bad';
+  $('db-status').textContent = 'خطأ في الاتصال 🔴';
+  showToast('فشل الاتصال بـ Firebase', true);
+}
+
+// ----------------- Tabs Switching -----------------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// State
+let rawLegs = {};
+let rawFares = {};
+let rawPax = {};
+let rawAgreement = null;
+
+// ----------------- Load & Listen: Legs -----------------
+function initLegsListener() {
+  const r = ref(db, 'reference/leg');
+  onValue(r, snap => {
+    rawLegs = snap.val() || {};
+    renderLegsTable();
+  });
+}
+
+function renderLegsTable(filterText = '') {
+  const tbody = $('table-legs').querySelector('tbody');
+  const entries = Object.entries(rawLegs).sort((a,b) => {
+    const ca = a[1].code || 0, cb = b[1].code || 0;
+    return ca - cb;
+  });
+  
+  const q = filterText.trim().toUpperCase();
+  const filtered = q ? entries.filter(([k, v]) => (v.label || k).toUpperCase().includes(q) || String(v.code).includes(q)) : entries;
+
+  $('legs-count').textContent = `${entries.length} مسار مسجل (المعروض: ${filtered.length})`;
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted)">لا توجد مسارات مطابقة</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(([key, item]) => {
+    const lbl = item.label || key;
+    const code = item.code ?? '';
+    return `
+      <tr data-key="${key}">
+        <td><strong>${key}</strong></td>
+        <td><span style="direction:ltr;display:inline-block">${lbl}</span></td>
+        <td><span class="code-tag">${code}</span></td>
+        <td style="text-align:center">
+          <button class="btn btn-outline btn-sm btn-edit-leg" data-key="${key}">تعديل</button>
+          <button class="btn btn-danger btn-sm btn-del-leg" data-key="${key}">حذف</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+$('search-legs').addEventListener('input', e => renderLegsTable(e.target.value));
+
+// Add Leg
+$('form-add-leg').addEventListener('submit', async e => {
+  e.preventDefault();
+  const rawK = $('leg-key').value.trim().toUpperCase();
+  const k = safeKey(rawK);
+  const lbl = $('leg-label').value.trim() || rawK;
+  const code = parseInt($legCode.value, 10);
+
+  if (!k || isNaN(code)) return;
+
+  $('btn-add-leg').disabled = true;
+  $('btn-add-leg').textContent = 'جاري الحفظ...';
+
+  try {
+    await set(ref(db, `reference/leg/${k}`), { label: lbl, code });
+    showToast(`تمت إضافة المسار ${k} بنجاح ✅`);
+    $('form-add-leg').reset();
+  } catch (err) {
+    showToast('حدث خطأ أثناء الحفظ: ' + err.message, true);
+  } finally {
+    $('btn-add-leg').disabled = false;
+    $('btn-add-leg').textContent = '💾 إضافة المسار';
+  }
+});
+const $legCode = $('leg-code');
+
+// Delete / Edit Leg Delegation
+$('table-legs').addEventListener('click', async e => {
+  const btnDel = e.target.closest('.btn-del-leg');
+  if (btnDel) {
+    const k = btnDel.dataset.key;
+    if (confirm(`هل أنت متأكد من حذف المسار (${k})؟`)) {
+      try {
+        await remove(ref(db, `reference/leg/${k}`));
+        showToast(`تم حذف المسار ${k} بنجاح`);
+      } catch (err) {
+        showToast('فشل الحذف: ' + err.message, true);
+      }
+    }
+    return;
+  }
+
+  const btnEdit = e.target.closest('.btn-edit-leg');
+  if (btnEdit) {
+    const k = btnEdit.dataset.key;
+    const cur = rawLegs[k];
+    if (!cur) return;
+    const newLbl = prompt(`تعديل اسم العرض للمسار (${k}):`, cur.label || k);
+    if (newLbl === null) return;
+    const newCodeStr = prompt(`تعديل رقم الكود للمسار (${k}):`, cur.code);
+    if (newCodeStr === null) return;
+    const newCode = parseInt(newCodeStr, 10);
+    if (isNaN(newCode)) { alert('رقم الكود غير صالح'); return; }
+
+    try {
+      await update(ref(db, `reference/leg/${k}`), { label: newLbl.trim() || k, code: newCode });
+      showToast(`تم تحديث المسار ${k} بنجاح`);
+    } catch (err) {
+      showToast('فشل التحديث: ' + err.message, true);
+    }
+  }
+});
+
+// ----------------- Load & Listen: Fares -----------------
+function initFaresListener() {
+  const r = ref(db, 'reference/fare');
+  onValue(r, snap => {
+    rawFares = snap.val() || {};
+    renderFaresTable();
+  });
+}
+
+function renderFaresTable(filterText = '') {
+  const tbody = $('table-fares').querySelector('tbody');
+  const entries = Object.entries(rawFares).sort((a,b) => (a[1].code || 0) - (b[1].code || 0));
+  const q = filterText.trim().toUpperCase();
+  const filtered = q ? entries.filter(([k, v]) => (v.label || k).toUpperCase().includes(q) || String(v.code).includes(q)) : entries;
+
+  $('fares-count').textContent = `${entries.length} فئة مسجلة (المعروض: ${filtered.length})`;
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted)">لا توجد فئات مطابقة</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(([key, item]) => {
+    const lbl = item.label || key;
+    const code = item.code ?? '';
+    return `
+      <tr data-key="${key}">
+        <td><strong style="direction:ltr;display:inline-block">${lbl}</strong></td>
+        <td><span class="code-tag">${code}</span></td>
+        <td style="text-align:center">
+          <button class="btn btn-outline btn-sm btn-edit-fare" data-key="${key}">تعديل</button>
+          <button class="btn btn-danger btn-sm btn-del-fare" data-key="${key}">حذف</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+$('search-fares').addEventListener('input', e => renderFaresTable(e.target.value));
+
+// Add Fare
+$('form-add-fare').addEventListener('submit', async e => {
+  e.preventDefault();
+  const rawLbl = $('fare-key').value.trim();
+  const k = safeKey(rawLbl);
+  const code = parseInt($('fare-code').value, 10);
+  if (!k || isNaN(code)) return;
+
+  $('btn-add-fare').disabled = true;
+  try {
+    await set(ref(db, `reference/fare/${k}`), { label: rawLbl, code });
+    showToast(`تمت إضافة الفئة بنجاح ✅`);
+    $('form-add-fare').reset();
+  } catch (err) {
+    showToast('حدث خطأ: ' + err.message, true);
+  } finally {
+    $('btn-add-fare').disabled = false;
+  }
+});
+
+// Delete / Edit Fare Delegation
+$('table-fares').addEventListener('click', async e => {
+  const btnDel = e.target.closest('.btn-del-fare');
+  if (btnDel) {
+    const k = btnDel.dataset.key;
+    if (confirm(`حذف الفئة (${k})؟`)) {
+      try {
+        await remove(ref(db, `reference/fare/${k}`));
+        showToast('تم الحذف بنجاح');
+      } catch (err) {
+        showToast('فشل الحذف: ' + err.message, true);
+      }
+    }
+    return;
+  }
+  const btnEdit = e.target.closest('.btn-edit-fare');
+  if (btnEdit) {
+    const k = btnEdit.dataset.key;
+    const cur = rawFares[k];
+    if (!cur) return;
+    const newLbl = prompt(`تعديل اسم الفئة:`, cur.label || k);
+    if (!newLbl) return;
+    const newCode = parseInt(prompt(`تعديل رقم الكود:`, cur.code), 10);
+    if (isNaN(newCode)) return;
+
+    try {
+      await update(ref(db, `reference/fare/${k}`), { label: newLbl.trim(), code: newCode });
+      showToast('تم التحديث بنجاح');
+    } catch (err) {
+      showToast('فشل التحديث: ' + err.message, true);
+    }
+  }
+});
+
+// ----------------- Tab 3: Agreement -----------------
+const DEFAULT_AGREEMENT = [
+  {name:'CAI', dests:['CAI'], out:{USD:[30,50,75]}, in:{USD:[20,30,40]}},
+  {name:'EBB / JUB / MCT / DOH / KWI', dests:['EBB','JUB','MCT','DOH','KWI'], out:{USD:[50,75,75]}, in:{USD:[50,75,75]}},
+  {name:'JED / RUH / TUU / ELQ / AHB / DMM / TIF / MED', dests:['JED','RUH','TUU','ELQ','AHB','DMM','TIF','MED'], out:{USD:[30,50,75]}, in:{USD:[25,40,75]}},
+  {name:'ADD / ASM', dests:['ADD','ASM'], out:{USD:[30,50,75]}, in:{USD:[25,40,75]}},
+  {name:'Domestic (الداخلي)', dests:['Domestic'], out:{USD:[20,35,50]}, in:{USD:[20,35,50]}}
+];
+
+function initAgreementListener() {
+  const r = ref(db, 'reference/agreement');
+  onValue(r, snap => {
+    const v = snap.val();
+    rawAgreement = v && Array.isArray(v) && v.length ? v : DEFAULT_AGREEMENT;
+    renderAgreement();
+  });
+}
+
+function renderAgreement() {
+  const box = $('agr-container');
+  box.innerHTML = rawAgreement.map((grp, idx) => {
+    const outV = (grp.out && grp.out.USD) || [0,0,0];
+    const inV = (grp.in && grp.in.USD) || [0,0,0];
+    return `
+      <div class="agr-card" data-idx="${idx}">
+        <h4>${grp.name}</h4>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">الوجهات: ${grp.dests.join(' / ')}</div>
+        <div style="display:grid;grid-template-columns:80px repeat(3, 1fr);gap:6px;font-weight:600;font-size:11px;color:var(--muted);text-align:center;margin-bottom:4px">
+          <div>الاتجاه</div><div>تعديل</div><div>استرجاع</div><div>No-Show</div>
+        </div>
+        <div class="pen-row">
+          <label>خارجي (Out):</label>
+          <input type="number" class="agr-in" data-idx="${idx}" data-dir="out" data-f="0" value="${outV[0]}">
+          <input type="number" class="agr-in" data-idx="${idx}" data-dir="out" data-f="1" value="${outV[1]}">
+          <input type="number" class="agr-in" data-idx="${idx}" data-dir="out" data-f="2" value="${outV[2]}">
+        </div>
+        <div class="pen-row">
+          <label>داخلي (In):</label>
+          <input type="number" class="agr-in" data-idx="${idx}" data-dir="in" data-f="0" value="${inV[0]}">
+          <input type="number" class="agr-in" data-idx="${idx}" data-dir="in" data-f="1" value="${inV[1]}">
+          <input type="number" class="agr-in" data-idx="${idx}" data-dir="in" data-f="2" value="${inV[2]}">
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+$('btn-save-agreement').addEventListener('click', async () => {
+  const inputs = document.querySelectorAll('.agr-in');
+  inputs.forEach(inp => {
+    const idx = parseInt(inp.dataset.idx, 10);
+    const dir = inp.dataset.dir;
+    const f = parseInt(inp.dataset.f, 10);
+    const val = parseFloat(inp.value) || 0;
+    if (rawAgreement[idx] && rawAgreement[idx][dir] && rawAgreement[idx][dir].USD) {
+      rawAgreement[idx][dir].USD[f] = val;
+    }
+  });
+
+  $('btn-save-agreement').disabled = true;
+  try {
+    await set(ref(db, 'reference/agreement'), rawAgreement);
+    showToast('تم حفظ تغييرات الاتفاقية في Firebase بنجاح! ✅');
+  } catch (err) {
+    showToast('فشل حفظ الاتفاقية: ' + err.message, true);
+  } finally {
+    $('btn-save-agreement').disabled = false;
+  }
+});
+
+// ----------------- Tab 4: Excel IDs Import -----------------
+function initCloudIdsListener() {
+  const r = ref(db, 'existing');
+  onValue(r, snap => {
+    const val = snap.val();
+    if (!val) {
+      $('cloud-ids-info').innerHTML = `⚠️ لا توجد IDs محفوظة في السحابة حالياً. جميع الصفوف في التطبيق ستعتبر <strong>Add</strong>.`;
+      $('btn-clear-cloud-ids').style.display = 'none';
+      return;
+    }
+
+    let count = 0;
+    const ids = Object.keys(val).filter(k => k.startsWith('chunk-'));
+    for (const k of ids) {
+      try {
+        const arr = JSON.parse(val[k].json);
+        count += arr.length;
+      } catch(e){}
+    }
+
+    const meta = val.meta || {};
+    const dateStr = meta.updated ? new Date(meta.updated).toLocaleString('ar-EG') : 'غير محدد';
+    $('cloud-ids-info').innerHTML = `
+      <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+        <div>المصدر: <strong>${meta.name || 'ملف مستورد'}</strong></div>
+        <div>إجمالي الغرامات المحفوظة: <strong class="stats-num">${count.toLocaleString()}</strong> غرامة</div>
+        <div>آخر تحديث: <span style="direction:ltr;display:inline-block">${dateStr}</span></div>
+      </div>
+    `;
+    $('btn-clear-cloud-ids').style.display = 'inline-flex';
+  });
+}
+
+$('btn-clear-cloud-ids').addEventListener('click', async () => {
+  if (confirm('هل أنت متأكد من مسح جميع الـ IDs من السحابة؟ سيتعين عليك استيراد ملف جديد لمطابقة الـ IDs.')) {
+    try {
+      await remove(ref(db, 'existing'));
+      showToast('تم مسح الـ IDs من السحابة.');
+    } catch(err) {
+      showToast('خطأ: ' + err.message, true);
+    }
+  }
+});
+
+const dropZone = $('drop-zone');
+const fileInput = $('file-excel');
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleExcelFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleExcelFile(e.target.files[0]);
+});
+
+function rowKey(pt, fa, lg, px, at, ba, fr, to, cu) {
+  return [pt, fa, lg, px, at, ba, fr, to, cu].join('|');
+}
+
+async function handleExcelFile(file) {
+  if (!file) return;
+  const progBox = $('import-progress');
+  const progTitle = $('prog-title');
+  const progBar = $('prog-bar');
+  const progPct = $('prog-pct');
+
+  progBox.style.display = 'block';
+  progTitle.textContent = 'جاري قراءة ملف الإكسل...';
+  progBar.style.width = '20%';
+  progPct.textContent = '20%';
+
+  try {
+    const buf = await file.arrayBuffer();
+    progTitle.textContent = 'جاري تحليل شيت Penalties...';
+    progBar.style.width = '40%';
+    progPct.textContent = '40%';
+
+    const wb = XLSX.read(buf, {type: 'array'});
+    const ws = wb.Sheets['Penalties'] || wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, {header: 1, defval: null, raw: true});
+    const h = (data[0] || []).map(x => x == null ? '' : String(x).trim());
+    const ix = n => h.indexOf(n);
+
+    const need = ['ID','Farebasis','Leg','Passenger Type','Penalty Type','Application Type','Between(hours)','And(hours)','Before or After flight','Currency','Modification pen amount','Modification pen mode','Refund pen amount','Refund pen mode'];
+    const miss = need.filter(n => ix(n) < 0);
+    if (miss.length) throw new Error('الأعمدة التالية مفقودة في الشيت: ' + miss.join(', '));
+
+    const map = new Map();
+    for (let i = 1; i < data.length; i++) {
+      const r = data[i];
+      const id = r[ix('ID')];
+      if (id === null || id === '' || r[ix('Farebasis')] == null) continue;
+
+      const k = rowKey(
+        r[ix('Penalty Type')],
+        r[ix('Farebasis')],
+        r[ix('Leg')],
+        r[ix('Passenger Type')],
+        r[ix('Application Type')],
+        r[ix('Before or After flight')],
+        r[ix('Between(hours)')],
+        r[ix('And(hours)')],
+        r[ix('Currency')]
+      );
+
+      if (!map.has(k)) {
+        map.set(k, [
+          id,
+          r[ix('Modification pen amount')],
+          r[ix('Modification pen mode')],
+          r[ix('Refund pen amount')],
+          r[ix('Refund pen mode')]
+        ]);
+      }
+    }
+
+    if (!map.size) throw new Error('لم يتم العثور على أي صفوف تحتوي على ID صالحة في الملف!');
+
+    progTitle.textContent = `تم العثور على ${map.size} غرامة بـ IDs. جاري الرفع إلى Firebase...`;
+    progBar.style.width = '70%';
+    progPct.textContent = '70%';
+
+    // Chunk upload into Firebase (500 items per chunk)
+    const pairs = [...map.entries()];
+    const CH = 500;
+    const obj = {
+      meta: {
+        name: file.name,
+        updated: Date.now(),
+        count: pairs.length
+      }
+    };
+
+    for (let i = 0; i * CH < pairs.length; i++) {
+      obj['chunk-' + String(i).padStart(3, '0')] = {
+        json: JSON.stringify(pairs.slice(i * CH, (i + 1) * CH))
+      };
+    }
+
+    await set(ref(db, 'existing'), obj);
+
+    progBar.style.width = '100%';
+    progPct.textContent = '100%';
+    progTitle.textContent = `تم بنجاح! تم رفع ومزامنة ${pairs.length.toLocaleString()} غرامة مع السحابة.`;
+    showToast(`تم رفع ملف ${file.name} بنجاح! ✅`);
+
+    setTimeout(() => {
+      progBox.style.display = 'none';
+      fileInput.value = '';
+    }, 4000);
+
+  } catch (err) {
+    console.error(err);
+    progTitle.textContent = 'فشل الاستيراد: ' + err.message;
+    progBar.style.background = 'var(--bad)';
+    showToast(err.message, true);
+  }
+}
+
+// ----------------- Tab 5: Pax -----------------
+function initPaxListener() {
+  const r = ref(db, 'reference/pax');
+  onValue(r, snap => {
+    rawPax = snap.val() || {};
+    renderPaxTable();
+  });
+}
+
+function renderPaxTable() {
+  const tbody = $('table-pax').querySelector('tbody');
+  const entries = Object.entries(rawPax).sort((a,b) => (a[1].code || 0) - (b[1].code || 0));
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted)">لا توجد بيانات</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = entries.map(([key, item]) => `
+    <tr data-key="${key}">
+      <td><strong style="direction:ltr;display:inline-block">${item.label || key}</strong></td>
+      <td><span class="code-tag">${item.code ?? ''}</span></td>
+      <td style="text-align:center">
+        <button class="btn btn-outline btn-sm btn-edit-pax" data-key="${key}">تعديل</button>
+        <button class="btn btn-danger btn-sm btn-del-pax" data-key="${key}">حذف</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+$('form-add-pax').addEventListener('submit', async e => {
+  e.preventDefault();
+  const lbl = $('pax-label').value.trim();
+  const k = safeKey(lbl);
+  const code = parseInt($('pax-code').value, 10);
+  if (!k || isNaN(code)) return;
+  $('btn-add-pax').disabled = true;
+  try {
+    await set(ref(db, `reference/pax/${k}`), { label: lbl, code });
+    showToast('تمت إضافة نوع الراكب بنجاح ✅');
+    $('form-add-pax').reset();
+  } catch (err) {
+    showToast('خطأ: ' + err.message, true);
+  } finally {
+    $('btn-add-pax').disabled = false;
+  }
+});
+
+$('table-pax').addEventListener('click', async e => {
+  const btnDel = e.target.closest('.btn-del-pax');
+  if (btnDel) {
+    const k = btnDel.dataset.key;
+    if (confirm(`حذف (${k})؟`)) {
+      try {
+        await remove(ref(db, `reference/pax/${k}`));
+        showToast('تم الحذف بنجاح');
+      } catch(err) {
+        showToast('خطأ: ' + err.message, true);
+      }
+    }
+    return;
+  }
+  const btnEdit = e.target.closest('.btn-edit-pax');
+  if (btnEdit) {
+    const k = btnEdit.dataset.key;
+    const cur = rawPax[k];
+    if (!cur) return;
+    const newLbl = prompt('اسم نوع الراكب:', cur.label || k);
+    if (!newLbl) return;
+    const newCode = parseInt(prompt('رقم الكود:', cur.code), 10);
+    if (isNaN(newCode)) return;
+    try {
+      await update(ref(db, `reference/pax/${k}`), { label: newLbl.trim(), code: newCode });
+      showToast('تم التحديث بنجاح');
+    } catch(err) {
+      showToast('خطأ: ' + err.message, true);
+    }
+  }
+});
+
+// Start listeners
+initLegsListener();
+initFaresListener();
+initAgreementListener();
+initCloudIdsListener();
+initPaxListener();
+
+</script>
+</body>
+</html>
