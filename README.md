@@ -18,14 +18,14 @@ No build step and no backend: open `index.html` or host it on GitHub Pages. Refe
 
 Yaser Aljaali - ياسر الجعلي
 
-## Firebase setup (multi-user)
+## Firebase setup (multi-user, Realtime Database)
 
-1. In the [Firebase Console](https://console.firebase.google.com) create a project.
+1. Firebase project: `penalties-setup`, with a Realtime Database.
 2. **Authentication** > Sign-in method > enable **Email/Password**, then add your users under *Users*.
-3. **Firestore Database** > Create database (production mode), then paste `firestore.rules` in the *Rules* tab and publish.
-4. **Project settings** > *Your apps* > add a **Web app**, copy the config into `firebase-config.js`.
+3. **Realtime Database** > *Rules* > paste `database.rules.json` and publish.
+4. **Project settings** > *Your apps* > Web app > copy the config into `firebase-config.js` (it must include `databaseURL`).
 5. **Authentication** > Settings > *Authorized domains* > add `yasso155.github.io`.
-6. Enable GitHub Pages for this repo (Settings > Pages > Deploy from branch `main`).
+6. Enable GitHub Pages (Settings > Pages > Deploy from branch `main`).
 
-Data layout: `existing/chunk-N` (shared penalty IDs and current values), `settings/main` (SDG rates), `drafts/{uid}` (each user's own selections and file).
+Data layout: `existing` (shared penalty IDs and current values), `settings` (SDG rates), `drafts/{uid}` (each user's own selections and file).
 While `firebase-config.js` is empty the page works in local mode (browser storage only).

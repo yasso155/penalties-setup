@@ -1,0 +1,9 @@
+{
+  "rules": {
+    "existing": { ".read": "auth != null", ".write": "auth != null" },
+    "settings": { ".read": "auth != null", ".write": "auth != null" },
+    "drafts": {
+      "$uid": { ".read": "auth != null && auth.uid === $uid", ".write": "auth != null && auth.uid === $uid" }
+    }
+  }
+}
