@@ -117,7 +117,8 @@ td.latin,th.latin{direction:ltr;text-align:left}
 .pen-card .pen-box h3{font-size:15px;margin-bottom:6px}
 .pen-card .num{font-size:20px;min-height:48px}
 .pen-card select{min-height:48px}
-.pen-card .f-row{grid-template-columns:minmax(0,1fr) 170px}
+.pen-card .f-row{grid-template-columns:minmax(0,1fr) 64px;align-items:center}
+.unit{color:var(--muted,#667);font-size:13px;font-weight:600}
 .lbl.mod,.th-mod{color:var(--mod)} .lbl.ref,.th-ref{color:var(--ref)}
 .lbl.mod,.lbl.ref{font-weight:600}
 .num.mod{border-color:var(--mod);background:var(--mod-soft)} .num.ref{border-color:var(--ref);background:var(--ref-soft)}
@@ -135,6 +136,13 @@ td.v-mod{color:var(--mod);font-weight:500} td.v-ref{color:var(--ref);font-weight
 .tag.same{background:transparent;border:1px solid var(--line);color:var(--muted)}
 .was{color:var(--muted);font-size:11.5px;font-weight:400;text-decoration:line-through}
 .tag.add{background:transparent;border:1px solid var(--good);color:var(--good)}
+.agr-b{flex:none;font-size:11px;line-height:1.5;padding:0 7px;border-radius:999px;border:1px solid var(--accent);color:var(--accent)}
+.agr-hint{margin-bottom:14px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface-2);font-size:13px;display:flex;flex-direction:column;gap:8px}
+.agr-hint .h{font-weight:600}
+.agr-hint .ln{overflow-wrap:anywhere}
+.agr-hint .warn{color:var(--warn)} .agr-hint .ok{color:var(--good)}
+.agr-hint .v-mod{color:var(--mod);font-weight:600} .agr-hint .v-ref{color:var(--ref);font-weight:600}
+.agr-btns{display:flex;gap:8px;flex-wrap:wrap}.agr-btns:empty{display:none}
 .noshow-box h3{display:flex;align-items:center;gap:10px}
 .noshow-box .inc{margin-inline-start:auto;display:flex;align-items:center;gap:8px;font-weight:500;font-size:14px;cursor:pointer}
 .noshow-box .inc input{width:16px;height:16px;accent-color:var(--accent)}
@@ -181,6 +189,7 @@ details.more[open]>summary{margin-bottom:6px}
         <div class="card-h"><span class="step">1</span><h2 id="h-pen">Penalties</h2>
           <div class="cur-wrap"><label for="cur">Currency</label><select id="cur"></select></div>
         </div>
+        <div class="agr-hint" id="agr-hint" hidden></div>
         <div class="pen-grid">
           <div class="pen-box" id="box-Before"></div>
           <div class="pen-box" id="box-After"></div>
@@ -356,6 +365,28 @@ function buildWorkbook(rows){
 }
 function toXlsxBuffer(rows){return XLSX.write(buildWorkbook(rows),{bookType:'xlsx',type:'array'});}
 
+/* ===== Agreement (J4 / 3T, Winter 26): penalties by destination group =====
+   Outbound = leg leaves KRT or PZU. Inbound = leg returns to KRT or PZU. Values: [Modify, Refund, No-show]. */
+const AGREEMENT=[
+  {name:'CAI',dests:['CAI'],
+   out:{USD:[30,50,75]}, in:{USD:[20,30,40]}},
+  {name:'EBB / JUB / MCT / DOH / KWI',dests:['EBB','JUB','MCT','DOH','KWI'],
+   out:{USD:[50,75,75]}, in:{USD:[50,75,75]}},
+  {name:'JED / RUH / TUU / ELQ / AHB / DMM / TIF / MED',dests:['JED','RUH','TUU','ELQ','AHB','DMM','TIF','MED'],
+   out:{USD:[30,50,75],SAR:[110,185,280],SDG:[300000,500000,750000]},
+   in:{USD:[25,40,75],SAR:[90,150,280],SDG:[250000,400000,750000]}},
+  {name:'ADD / ASM',dests:['ADD','ASM'],
+   out:{USD:[30,50,75]}, in:{USD:[25,40,75]}},
+];
+const AGREEMENT_DOMESTIC={name:'Domestic',vals:{USD:[20,35,50]},
+  legs:['PZU-KRT','KRT-PZU','PZU-DOG','DOG-PZU','PZU-KSL','KSL-PZU','KRT-DOG','DOG-KRT','KRT-KSL','KSL-KRT']};
+const AGR_LEG=new Map();   // leg -> {group, dir, vals}
+for (const g of AGREEMENT) for (const d of g.dests) for (const o of ['KRT','PZU']){
+  for (const [leg,dir,vals] of [[`${o}-${d}`,'Outbound',g.out],[`${d}-${o}`,'Inbound',g.in]])
+    if (CODE.leg.has(leg)) AGR_LEG.set(leg,{group:g.name,dir,vals});
+}
+for (const leg of AGREEMENT_DOMESTIC.legs) if (CODE.leg.has(leg)) AGR_LEG.set(leg,{group:AGREEMENT_DOMESTIC.name,dir:'Both',vals:AGREEMENT_DOMESTIC.vals});
+
 /* ===== Validation ===== */
 function parseAmt(s){
   s=String(s).trim().replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace('٫','.').replace(',','.');
@@ -384,16 +415,16 @@ const state={
   pen:{Before:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
        After:{mod:{amt:'112.5',mode:'Value'},ref:{amt:'187.5',mode:'Value'}},
        NoShow:blankPen()},
-  cur:'USD', startId:'1', batch:[], noshowOn:false, existing:new Map(), existingName:'', imported:false
+  cur:'USD', startId:'1', batch:[], noshowOn:true, existing:new Map(), existingName:'', imported:false
 };
 function load(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(!s)return;
     if(Array.isArray(s.fares))state.fares=new Set(s.fares.filter(x=>CODE.fare.has(x)));
     if(Array.isArray(s.legs))state.legs=new Set(s.legs.filter(x=>CODE.leg.has(x)));
-    if(s.pen&&s.pen.Before&&s.pen.After)state.pen=s.pen;
+    if(s.pen&&s.pen.Before&&s.pen.After){state.pen=s.pen;for(const b of Object.keys(state.pen))for(const k of ['mod','ref'])if(state.pen[b]&&state.pen[b][k])state.pen[b][k].mode='Value';}
     if(ENABLED_CURRENCIES.includes(s.cur))state.cur=s.cur;
-    state.noshowOn=!!s.noshowOn; if(s.startId)state.startId=String(s.startId);
+    if(s.startId)state.startId=String(s.startId);
     if(Array.isArray(s.batch))state.batch=s.batch;
   }catch(e){}
 }
@@ -407,7 +438,7 @@ function save(){
 }
 
 /* --- Picker (search + multi-select) --- */
-function makePicker(root,items,set,placeholder,onChange){
+function makePicker(root,items,set,placeholder,onChange,badge){
   root.innerHTML=`<input type="search" class="latin" placeholder="${placeholder}" aria-label="${placeholder}" dir="ltr">
     <div class="pick-tools"><button type="button" data-a="all">Select all shown</button><button type="button" data-a="none">Clear selection</button><span class="count"></span></div>
     <div class="pick-list" role="group"></div><div class="chips"></div>`;
@@ -420,7 +451,7 @@ function makePicker(root,items,set,placeholder,onChange){
   function drawList(){
     const t=q.value.trim().toLowerCase();
     shown=t?items.filter(l=>l.toLowerCase().includes(t)):items;
-    list.innerHTML=shown.length?shown.map(l=>`<label class="pick-row"><input type="checkbox" value="${esc(l)}"${set.has(l)?' checked':''}><span class="latin">${esc(l)}</span></label>`).join('')
+    list.innerHTML=shown.length?shown.map(l=>`<label class="pick-row"><input type="checkbox" value="${esc(l)}"${set.has(l)?' checked':''}><span class="latin">${esc(l)}</span>${badge?badge(l):''}</label>`).join('')
       :'<div class="empty-note">No matches.</div>';
   }
   q.addEventListener('input',drawList);
@@ -441,7 +472,7 @@ function penFields(ba,off){
   const p=state.pen[ba];
   return ['mod','ref'].map(k=>`<div><label class="lbl ${k}" for="${ba}-${k}-amt">${k==='mod'?'Modification':'Refund'}</label>
       <div class="f-row"><input class="num ${k}" id="${ba}-${k}-amt" type="text" inputmode="decimal" autocomplete="off" value="${esc(p[k].amt)}" data-ba="${ba}" data-k="${k}"${off?' disabled':''}>
-      <select id="${ba}-${k}-mode" aria-label="Type" data-ba="${ba}" data-k="${k}"${off?' disabled':''}>${modeOpts(p[k].mode)}</select></div>
+      <span class="unit latin">${state.cur}</span></div>
       <div class="err" id="${ba}-${k}-err"></div></div>`).join('');
 }
 function drawPen(ba){
@@ -455,7 +486,7 @@ function drawPen(ba){
   box.innerHTML=`<h3><span class="tag ${ba==='After'?'after':''} latin">${ba}</span>flight${ba==='After'?'<button class="link" type="button" data-copy>Copy from Before</button>':''}</h3>
     ${['mod','ref'].map(k=>`<label class="lbl ${k}" for="${ba}-${k}-amt">${k==='mod'?'Modification':'Refund'}</label>
       <div class="f-row"><input class="num ${k}" id="${ba}-${k}-amt" type="text" inputmode="decimal" autocomplete="off" value="${esc(state.pen[ba][k].amt)}" data-ba="${ba}" data-k="${k}">
-      <select id="${ba}-${k}-mode" aria-label="Type" data-ba="${ba}" data-k="${k}">${modeOpts(state.pen[ba][k].mode)}</select></div>
+      <span class="unit latin">${state.cur}</span></div>
       <div class="err" id="${ba}-${k}-err"></div>`).join('')}`;
 }
 function wirePen(){
@@ -534,13 +565,44 @@ function drawQuick(){
     `<button type="button" data-fare="${esc(l)}" aria-pressed="${state.fares.has(l)}" title="${esc(l)}"><b>${k}</b><span class="latin">${esc(n)}</span></button>`).join('')+
     `<button type="button" class="all" data-fare="*all" aria-pressed="${all}">Select all</button>`;
 }
+/* --- Agreement hint --- */
+let agrApply=null;
+const fmtN=n=>Number(n).toLocaleString('en-US');
+function drawHint(){
+  const box=$('agr-hint'),cur=state.cur,sel=[...state.legs],hits=sel.filter(l=>AGR_LEG.has(l));
+  agrApply=null;
+  if(!hits.length){box.hidden=true;box.innerHTML='';return;}
+  const items=hits.map(l=>({a:AGR_LEG.get(l),legs:[l]}));
+  const sigs=new Set(items.map(c=>JSON.stringify(c.a.vals[cur]||null)));
+  const lines=items.map(c=>{
+    const v=c.a.vals[cur],u=c.a.vals.USD;
+    const shown=v?`<span class="v-mod">Modify ${fmtN(v[0])}</span> · <span class="v-ref">Refund ${fmtN(v[1])}</span> · No-show ${fmtN(v[2])} ${cur}`
+      :`<span class="warn">No ${cur} value in the agreement</span> (USD: ${u[0]} / ${u[1]} / ${u[2]})`;
+    return `<div class="ln"><b class="latin">${esc(c.legs[0])}</b> · ${c.a.dir}<br>${shown}</div>`;
+  }).join('');
+  let foot='',btn='';
+  const only=sigs.size===1&&items[0].a.vals[cur]?items[0].a.vals[cur]:null;
+  if(sigs.size>1)foot='<div class="warn">The selected legs have different agreement values. Add them separately.</div>';
+  else if(only){
+    const [m,r,n]=only,P=state.pen,eq=(x,y)=>String(x.amt).trim()!==''&&Number(x.amt)===y&&x.mode==='Value';
+    const match=['Before','After'].every(b=>eq(P[b].mod,m)&&eq(P[b].ref,r))&&state.noshowOn&&eq(P.NoShow.mod,n)&&eq(P.NoShow.ref,n);
+    if(match)foot='<div class="ok">The form matches the agreement.</div>';
+    else{agrApply=only;btn='<button type="button" id="agr-apply">Apply to form</button>';}
+  }
+  const miss=sel.length-hits.length;
+  if(miss)foot+=`<div>${miss} selected leg${miss===1?' is':'s are'} not in the agreement.</div>`;
+  const usable=hits.filter(l=>AGR_LEG.get(l).vals[cur]).length;
+  const btn2=usable&&state.fares.size?`<button type="button" id="agr-add" class="primary">Add ${usable} leg${usable===1?'':'s'} to file by agreement</button>`:'';
+  box.innerHTML=`<div class="h">Agreement hint (${cur})</div>${lines}${foot}<div class="agr-btns">${btn}${btn2}</div>`;
+  box.hidden=false;
+}
 function drawExisting(){
   const n=state.existing.size,st=$('ex-status');
   st.className='ex-s '+(n?'good':'warn');
   st.textContent=n?`${n} penalties loaded${state.existingName?' from '+state.existingName:''}`:'Not imported: every row will be Add.';
   $('ex-clear').hidden=!(n&&state.imported);
 }
-function refresh(){drawExisting();drawQuick();drawPreview();drawBatch();save();}
+function refresh(){drawHint();drawExisting();drawQuick();drawPreview();drawBatch();save();}
 function say(cls,txt){const s=$('status');s.className='status '+cls;s.textContent=txt;s.dataset.keep='1';setTimeout(()=>{delete s.dataset.keep;},4000);}
 
 /* --- Wire up --- */
@@ -556,7 +618,7 @@ async function loadBuiltin(){
   }catch(e){}
 }
 const farePicker=makePicker($('fare-picker'),REF.fare.map(x=>x[0]),state.fares,'Search Farebasis',refresh);
-const legPicker=makePicker($('leg-picker'),REF.leg.map(x=>x[0]),state.legs,'Search Leg, e.g. JED',refresh);
+const legPicker=makePicker($('leg-picker'),REF.leg.map(x=>x[0]),state.legs,'Search Leg, e.g. JED',refresh,l=>AGR_LEG.has(l)?'<span class="agr-b" title="In the agreement">Agreement</span>':'');
 $('fare-quick').addEventListener('click',e=>{
   const b=e.target.closest('[data-fare]');if(!b)return;
   const v=b.dataset.fare;
@@ -567,7 +629,7 @@ $('fare-quick').addEventListener('click',e=>{
 drawPen('Before');drawPen('After');drawPen('NoShow');wirePen();
 if([...state.fares].some(l=>!QUICK_FARES.some(q=>q[1]===l)))$('fare-more').open=true;
 $('cur').innerHTML=ENABLED_CURRENCIES.map(c=>`<option value="${c}"${c===state.cur?' selected':''}>${c}</option>`).join('');
-$('cur').addEventListener('change',e=>{state.cur=e.target.value;refresh();});
+$('cur').addEventListener('change',e=>{state.cur=e.target.value;for(const b of ['Before','After','NoShow'])drawPen(b);refresh();});
 
 $('btn-add').addEventListener('click',()=>{
   if(draftProblems().length)return;
@@ -575,6 +637,25 @@ $('btn-add').addEventListener('click',()=>{
   say('ok',`Added ${plural(ruleRows(rule).length)} to the file.`);
 });
 $('batch-list').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;state.batch.splice(+b.dataset.del,1);refresh();});
+$('agr-hint').addEventListener('click',e=>{
+  if(e.target.id==='agr-add'){
+    const by=new Map(),cur=state.cur;
+    for(const l of state.legs){const a=AGR_LEG.get(l),v=a&&a.vals[cur];if(!v)continue;const k=v.join('|');if(!by.has(k))by.set(k,{v,legs:[]});by.get(k).legs.push(l);}
+    let n=0,legsN=0;
+    for(const {v,legs} of by.values()){
+      const pv=(m,r)=>({mod:{amt:m,mode:'Value'},ref:{amt:r,mode:'Value'}});
+      const pen={Before:pv(v[0],v[1]),After:pv(v[0],v[1])};
+      const rule={fares:[...state.fares],legs,pen,noshow:pv(v[2],v[2]),cur};
+      state.batch.push({rule});n+=ruleRows(rule).length;legsN+=legs.length;
+    }
+    refresh();say('ok',`Added ${plural(n)} to the file from the agreement (${legsN} leg${legsN===1?'':'s'}).`);return;
+  }
+  if(e.target.id!=='agr-apply'||!agrApply)return;
+  const [m,r,n]=agrApply,P=state.pen,set=(x,v)=>{x.amt=String(v);x.mode='Value';};
+  for(const b of ['Before','After']){set(P[b].mod,m);set(P[b].ref,r);}
+  set(P.NoShow.mod,n);set(P.NoShow.ref,n);state.noshowOn=true;
+  drawPen('Before');drawPen('After');drawPen('NoShow');refresh();
+});
 $('ex-btn').addEventListener('click',()=>$('ex-file').click());
 $('ex-file').addEventListener('change',async e=>{
   const f=e.target.files[0]; if(!f)return;
