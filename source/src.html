@@ -133,6 +133,9 @@ td.v-mod{color:var(--mod);font-weight:500} td.v-ref{color:var(--ref);font-weight
 .xf-h{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.xf-h .tag{flex:none}
 .xf-h b{overflow-wrap:anywhere}
 .xf .sub2{color:var(--muted);font-size:12.5px}
+.xg-list{display:flex;flex-direction:column;gap:6px;margin:4px 0}
+.xg{background:var(--surface-2);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;font-size:12.5px;overflow-wrap:anywhere}
+.xg-v span:first-child{display:inline-block;min-width:52px;color:var(--muted)}
 .xf-b{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .xf-b button{font-size:12.5px;padding:4px 10px;min-height:0}
 .xf-wait{background:var(--surface-2);border:1px solid var(--warn);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:13px}
@@ -802,6 +805,36 @@ const fmtWhen=t=>new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short'
 const packRows=rows=>JSON.stringify(rows.map(r=>[r.action,r.id===undefined?null:r.id,r.ptype,r.fare,r.leg,r.pax,r.ba,r.from,r.to,r.cur,r.modAmt,r.modMode,r.refAmt,r.refMode]));
 const unpackRows=t=>JSON.parse(t).map(([action,id,ptype,fare,leg,pax,ba,from,to,cur,modAmt,modMode,refAmt,refMode])=>{
   const r={action,ptype,fare,leg,pax,ba,from,to,cur,modAmt,modMode,refAmt,refMode};if(id!==null)r.id=id;return r;});
+/* What an export contains, in plain terms: legs and classes that share the same penalty amounts are shown as one group. */
+function summarize(rows){
+  const lf=new Map();
+  for(const r of rows){
+    const k=r.leg+'|'+r.fare;let o=lf.get(k);
+    if(!o){o={leg:r.leg,fare:r.fare.split(' ')[0],cur:r.cur,vals:{}};lf.set(k,o);}
+    const t=r.ptype==='NoShow'?'NoShow':r.ba;
+    if(!(t in o.vals))o.vals[t]=[r.modAmt,r.modMode,r.refAmt,r.refMode];
+  }
+  const g=new Map();
+  for(const o of lf.values()){
+    const sig=JSON.stringify([o.cur,o.vals]);let e=g.get(sig);
+    if(!e){e={cur:o.cur,vals:o.vals,m:new Map()};g.set(sig,e);}
+    if(!e.m.has(o.leg))e.m.set(o.leg,new Set());e.m.get(o.leg).add(o.fare);
+  }
+  const out=[];
+  for(const e of g.values()){
+    const by=new Map();
+    for(const [leg,fs] of e.m){const k=[...fs].sort().join(', ');if(!by.has(k))by.set(k,{fares:k,legs:[]});by.get(k).legs.push(leg);}
+    for(const b of by.values())out.push({legs:b.legs,fares:b.fares,cur:e.cur,vals:e.vals});
+  }
+  return out;
+}
+function drawGroups(rows){
+  return summarize(rows).map(g=>{
+    const line=(t,lab)=>g.vals[t]?`<div class="xg-v latin"><span>${lab}</span> Modification <span class="v-mod">${fmtPen(g.vals[t][0],g.vals[t][1],g.cur)}</span> · Refund <span class="v-ref">${fmtPen(g.vals[t][2],g.vals[t][3],g.cur)}</span></div>`:'';
+    return `<div class="xg"><div><b>${g.legs.length===1?'Leg':'Legs ('+g.legs.length+')'}</b> <span class="latin">${esc(g.legs.join(', '))}</span></div>
+      <div><b>${g.fares.includes(',')?'Classes':'Class'}</b> <span class="latin">${esc(g.fares)}</span></div>
+      ${line('Before','Before')}${line('After','After')}${line('NoShow','No-show')}</div>`;}).join('');
+}
 /* Exported files list: filled by cloud.js through PenApp.setExports */
 let XF=[];
 function drawExports(){
@@ -813,9 +846,10 @@ function drawExports(){
   $('xf-list').innerHTML=XF.map(x=>{
     const up=x.status==='uploaded',canDel=P.canDelete&&P.canDelete(x);
     return `<li class="xf${up?'':' wait'}" data-id="${esc(x.id)}">
-      <div class="xf-h"><b class="latin">${esc(x.name||'Export')}</b><span class="tag ${up?'done':'wait'} latin">${up?'Uploaded':'Pending'}</span></div>
-      <div class="sub2">${plural(x.count)} · ${x.adds||0} new · ${x.updates||0} changed</div>
-      <div class="sub2">Exported by ${esc(x.by||'someone')}, ${esc(fmtWhen(x.at))}</div>
+      <div class="xf-h"><b>${plural(x.count)}</b><span class="tag ${up?'done':'wait'} latin">${up?'Uploaded':'Pending'}</span></div>
+      <div class="sub2">${x.adds||0} new · ${x.updates||0} changed</div>
+      ${x.rows?`<div class="xg-list">${(()=>{try{return drawGroups(unpackRows(x.rows));}catch(e){return '';}})()}</div>`:`<div class="sub2 latin">${esc(x.name||'')}</div>`}
+      <div class="sub2">Exported by ${esc(x.by||'someone')}, ${esc(fmtWhen(x.at))}${x.rows?` · <span class="latin">${esc(x.name||'')}</span>`:''}</div>
       ${up?`<div class="sub2">Uploaded by ${esc(x.uploadedBy||'someone')}, ${esc(fmtWhen(x.uploadedAt))}</div>`:''}
       <div class="xf-b">
         ${x.rows?'<button type="button" data-act="dl">Download</button>':''}
