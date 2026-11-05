@@ -23,7 +23,7 @@ function start(){
   /* ---------- login + signed-in badge ---------- */
   const gate=mountLogin(auth,{title:'Penalties Setup'});
   const who=document.createElement('div');who.id='who';who.hidden=true;
-  who.innerHTML='<span id="who-mail"></span><button type="button" id="who-out">Sign out</button>';
+  who.innerHTML='<span id="who-mail"></span><span class="role" id="who-role"></span><button type="button" id="who-out">Sign out</button>';
   document.querySelector('.top').appendChild(who);
   $('who-out').addEventListener('click',()=>fullSignOut(auth));
 
@@ -185,7 +185,7 @@ function start(){
       if(r==='pending'||r==='disabled'){uid=null;role=null;applyRole('');who.hidden=true;gate.showBlocked(user.email,r);return;}
       if(enforceLocalOwner(user.uid)){location.reload();return;}   // different account than the one this browser last used
       uid=user.uid;role=r;applyRole(r);gate.hide();
-      who.hidden=false;$('who-mail').textContent=(user.email||'')+' · '+r;
+      who.hidden=false;$('who-mail').textContent=user.email||'';$('who-role').textContent=r;
       await loadAll();
     });
   }

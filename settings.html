@@ -5,25 +5,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Penalties Setup — Settings</title>
 <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon.ico">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
-  --bg: #f0f4f9;
+  --bg: #EDF0F5;
   --surface: #ffffff;
-  --line: #d8dde6;
-  --text: #1b1f24;
-  --muted: #57606a;
-  --primary: #0969da;
-  --primary-hover: #0856b3;
-  --bad: #cf222e;
-  --bad-bg: #ffebe9;
-  --ok: #1a7f37;
-  --ok-bg: #dafbe1;
-  --warn: #9a6700;
-  --warn-bg: #fff8c5;
-  --radius: 10px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --surface-2: #F5F7FA;
+  --line: #D3DAE4;
+  --text: #14202E;
+  --muted: #5A6778;
+  --primary: #1F5FBF;
+  --primary-hover: #184C9A;
+  --accent-soft: #E3ECFA;
+  --bad: #B3261E;
+  --bad-bg: #FBE3E1;
+  --ok: #1D7A4B;
+  --ok-bg: #DDF3E6;
+  --warn: #A85A07;
+  --warn-bg: #FDEBD9;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(20,32,46,.05), 0 6px 20px rgba(20,32,46,.04);
+  --font: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
 }
 * { box-sizing: border-box; }
 body {
@@ -68,12 +72,12 @@ body {
   font-size: 13px;
   padding: 6px 12px;
   border-radius: 6px;
-  background: #f3f7fe;
-  border: 1px solid #d0e1fd;
+  background: var(--accent-soft);
+  border: 1px solid transparent;
   transition: all 0.2s;
 }
 .back-link:hover {
-  background: #e1edfe;
+  border-color: var(--primary);
 }
 .badge {
   font-size: 12px;
@@ -261,8 +265,8 @@ tr:hover td {
 .code-tag {
   display: inline-block;
   font-family: monospace;
-  background: #eef2ff;
-  color: #3b5998;
+  background: var(--accent-soft);
+  color: var(--primary);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
@@ -301,7 +305,7 @@ tr:hover td {
 }
 .upload-zone:hover, .upload-zone.dragover {
   border-color: var(--primary);
-  background: #f0f6ff;
+  background: var(--accent-soft);
 }
 .upload-icon {
   font-size: 40px;
@@ -375,6 +379,36 @@ th { position: sticky; top: 0; z-index: 1; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .stn-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .stn-row .form-group { width: 200px; }
+
+/* ---- Refinements: same identity as the main page ---- */
+td .btn + .btn { margin-inline-start: 6px; }
+td:last-child { white-space: nowrap; }
+#stn-code::placeholder { text-transform: none; }
+body { font-family: var(--font); }
+.header { padding: 12px 24px; }
+.header-title h1 { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.container { max-width: 1180px; margin-top: 20px; }
+.nav-tabs { gap: 4px; padding-bottom: 0; border-bottom: 1px solid var(--line); }
+.tab-btn { padding: 10px 16px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-weight: 500; }
+.tab-btn.active { font-weight: 600; border-bottom-color: var(--primary); background: transparent; }
+.card { padding: 20px 22px; }
+.card-title { font-size: 17px; font-weight: 600; }
+.form-group label { font-size: 13px; font-weight: 500; }
+input[type="text"], input[type="number"], input[type="email"], select { min-height: 40px; border-radius: 8px; background: var(--surface-2); }
+input[type="email"] { font-family: inherit; font-size: 13px; padding: 8px 12px; border: 1px solid var(--line); color: var(--text); outline: none; }
+input[type="email"]:focus { border-color: var(--primary); background: #fff; }
+input:focus-visible, select:focus-visible, .btn:focus-visible, .tab-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.btn { min-height: 38px; border-radius: 8px; }
+.btn-sm { min-height: 30px; padding: 4px 10px; }
+.btn-outline:hover { background: var(--accent-soft); border-color: var(--primary); }
+.table-wrap { border-radius: 10px; }
+th { font-size: 12.5px; font-weight: 500; }
+td { padding: 9px 14px; }
+.code-tag { font-family: var(--mono); font-weight: 500; }
+.badge { font-weight: 500; }
+.agr-card { border-radius: 10px; background: var(--surface-2); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (max-width: 700px) { .header { padding: 10px 16px; } .card { padding: 16px; } }
 </style>
 </head>
 <body>
@@ -454,7 +488,7 @@ th { position: sticky; top: 0; z-index: 1; }
               <th>Leg key</th>
               <th>Label</th>
               <th>Code</th>
-              <th style="width:120px;text-align:center">Actions</th>
+              <th style="width:170px;text-align:center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -499,7 +533,7 @@ th { position: sticky; top: 0; z-index: 1; }
             <tr>
               <th>Fare class</th>
               <th>Code</th>
-              <th style="width:120px;text-align:center">Actions</th>
+              <th style="width:170px;text-align:center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -591,7 +625,7 @@ th { position: sticky; top: 0; z-index: 1; }
             <tr>
               <th>Passenger type</th>
               <th>Code</th>
-              <th style="width:120px;text-align:center">Actions</th>
+              <th style="width:170px;text-align:center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -632,7 +666,7 @@ th { position: sticky; top: 0; z-index: 1; }
       <p style="margin:4px 0 0;color:var(--muted);font-size:13px">These people signed in but have no role yet (for example, accounts created in the Firebase Console).</p>
       <div class="table-wrap">
         <table id="table-pending">
-          <thead><tr><th>Email</th><th>Give role</th><th style="width:170px;text-align:center">Actions</th></tr></thead>
+          <thead><tr><th>Email</th><th>Give role</th><th style="width:220px;text-align:center">Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
