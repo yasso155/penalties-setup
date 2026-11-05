@@ -7,7 +7,7 @@ import {firebaseConfig} from './firebase-config.js';
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {mountLogin,resolveRole,applyRole,fullSignOut,enforceLocalOwner} from './access.js';
-import {getDatabase,ref,get,set,update,onValue,push,query,orderByChild,startAt,limitToLast}
+import {getDatabase,ref,get,set,update,onValue,push,query,orderByChild,startAt,limitToLast,remove}
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
 if(!firebaseConfig.apiKey||!firebaseConfig.databaseURL){console.info('Firebase not configured: running in local mode.');}
@@ -140,30 +140,33 @@ function start(){
     const out=[];if(s.exists())s.forEach(c=>{const v=c.val();if(v&&typeof v.sigs==='string')out.push(v);});
     return out.sort((a,b)=>b.at-a.at);
   }
-  async function showLastExport(){
-    const el=$('last-export');if(!el)return;
-    try{
-      const l=(await recentExports())[0];
-      if(!l){el.hidden=true;return;}
-      el.hidden=false;el.textContent=`Last export: ${l.by||'someone'}, ${fmt(l.at)} (${l.count} rows)`;
-    }catch(e){el.hidden=true;}
-  }
   function installExportLog(){
     P.guard=async sigs=>{
       const list=await recentExports(),dups=new Set(),exports=[];
       const mine=new Set(sigs);
       for(const x of list){
         const common=x.sigs.split(',').filter(h=>mine.has(h));
-        if(common.length){common.forEach(h=>dups.add(h));exports.push({by:x.by,at:x.at,common:common.length});}
+        if(common.length){common.forEach(h=>dups.add(h));exports.push({by:x.by,at:x.at,status:x.status,common:common.length});}
       }
       return {dups,exports};
     };
-    P.log=async({count,sigs,name})=>{
+    P.log=async({count,sigs,name,adds,updates,rows})=>{
       const u=auth.currentUser;
-      await set(push(R('exports')),{uid:u.uid,by:u.email||'',at:Date.now(),count,name:name||'',sigs:sigs.join(',')});
-      showLastExport();
+      await set(push(R('exports')),{uid:u.uid,by:u.email||'',at:Date.now(),count,adds,updates,name:name||'',sigs:sigs.join(','),rows,status:'exported'});
     };
-    showLastExport();
+    P.markUploaded=async id=>{
+      const u=auth.currentUser,at=Date.now();
+      await update(R('exports/'+id),{status:'uploaded',uploadedBy:u.email||'',uploadedAt:at});
+    };
+    P.removeExport=id=>remove(R('exports/'+id));
+    P.canDelete=x=>role==='admin'||x.uid===uid;
+    /* Last 20 exports, live: everyone sees who exported what and whether it was uploaded */
+    unsubs.push(onValue(query(R('exports'),orderByChild('at'),limitToLast(20)),s=>{
+      const list=[];s.forEach(ch=>{const v=ch.val();if(v)list.push({...v,id:ch.key});});
+      list.sort((a,b)=>b.at-a.at);
+      const cut=Date.now()-30*24*3600*1000;   // uploaded files older than 30 days drop off the list
+      P.setExports(list.filter(x=>x.status!=='uploaded'||(x.uploadedAt||x.at)>cut));
+    },e=>console.warn(e)));
   }
 
   /* ---------- realtime: other users' imports and rate changes ---------- */

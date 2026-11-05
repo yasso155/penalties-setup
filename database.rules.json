@@ -39,8 +39,17 @@
         "at"
       ],
       "$id": {
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer') && !data.exists() && newData.child('uid').val() === auth.uid",
-        ".validate": "newData.hasChildren(['uid','by','at','count','sigs']) && newData.child('at').isNumber() && newData.child('count').isNumber()"
+        ".write": "(auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer') && !data.exists() && newData.child('uid').val() === auth.uid) || (auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin') || (auth != null && data.exists() && !newData.exists() && data.child('uid').val() === auth.uid)",
+        "status": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer')"
+        },
+        "uploadedBy": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer')"
+        },
+        "uploadedAt": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer')"
+        },
+        ".validate": "newData.hasChildren(['uid','by','at','count','sigs','status']) && newData.child('at').isNumber() && newData.child('count').isNumber() && (newData.child('status').val() === 'exported' || newData.child('status').val() === 'uploaded')"
       }
     }
   }

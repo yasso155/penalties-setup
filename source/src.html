@@ -127,6 +127,17 @@ td.v-mod{color:var(--mod);font-weight:500} td.v-ref{color:var(--ref);font-weight
 .skip small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:1px}
 .last-ex{color:var(--muted);font-size:12.5px;margin:-4px 0 12px}
 .last-ex[hidden]{display:none}
+.xf-list{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+.xf{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.xf.wait{border-color:var(--warn)}
+.xf-h{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.xf-h .tag{flex:none}
+.xf-h b{overflow-wrap:anywhere}
+.xf .sub2{color:var(--muted);font-size:12.5px}
+.xf-b{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.xf-b button{font-size:12.5px;padding:4px 10px;min-height:0}
+.xf-wait{background:var(--surface-2);border:1px solid var(--warn);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:13px}
+.tag.wait{background:transparent;border:1px solid var(--warn);color:var(--warn)}
+.tag.done{background:transparent;border:1px solid var(--good);color:var(--good)}
 .dlg-bg{position:fixed;inset:0;z-index:2500;background:rgba(10,15,25,.45);display:flex;align-items:center;justify-content:center;padding:16px}
 .dlg{width:min(460px,100%);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
 .dlg h3{margin:0 0 8px;font-size:17px}
@@ -284,9 +295,13 @@ button.link{min-height:0}
           <div class="ex-row"><b>Existing penalties</b></div>
           <div class="ex-s" id="ex-status"></div>
         </div>
-        <div class="ex-s last-ex" id="last-export" hidden></div>
         <div class="add-bar"><button class="primary" id="btn-export" type="button">Export Excel</button></div>
         <div class="status" id="status" role="status" aria-live="polite"></div>
+      </section>
+      <section class="card" id="xf-card" aria-labelledby="h-xf" hidden>
+        <div class="card-h"><h2 id="h-xf">Exported files</h2></div>
+        <div class="xf-wait" id="xf-wait" hidden></div>
+        <ul class="xf-list" id="xf-list"></ul>
       </section>
     </aside>
   </main>
@@ -783,6 +798,49 @@ function choose(title,html,buttons){return new Promise(res=>{
   (o.querySelector('button.primary')||o.querySelector('button')).focus();
 });}
 const fmtWhen=t=>new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+/* Compact form of an export (stored in Firebase so a colleague can download the same file) */
+const packRows=rows=>JSON.stringify(rows.map(r=>[r.action,r.id===undefined?null:r.id,r.ptype,r.fare,r.leg,r.pax,r.ba,r.from,r.to,r.cur,r.modAmt,r.modMode,r.refAmt,r.refMode]));
+const unpackRows=t=>JSON.parse(t).map(([action,id,ptype,fare,leg,pax,ba,from,to,cur,modAmt,modMode,refAmt,refMode])=>{
+  const r={action,ptype,fare,leg,pax,ba,from,to,cur,modAmt,modMode,refAmt,refMode};if(id!==null)r.id=id;return r;});
+/* Exported files list: filled by cloud.js through PenApp.setExports */
+let XF=[];
+function drawExports(){
+  const card=$('xf-card'),P=window.PenApp||{};
+  card.hidden=!XF.length;
+  const wait=XF.filter(x=>x.status!=='uploaded');
+  $('xf-wait').hidden=!wait.length;
+  $('xf-wait').textContent=wait.length?`${wait.length} ${wait.length===1?'file is':'files are'} waiting to be uploaded to the airline system.`:'';
+  $('xf-list').innerHTML=XF.map(x=>{
+    const up=x.status==='uploaded',canDel=P.canDelete&&P.canDelete(x);
+    return `<li class="xf${up?'':' wait'}" data-id="${esc(x.id)}">
+      <div class="xf-h"><b class="latin">${esc(x.name||'Export')}</b><span class="tag ${up?'done':'wait'} latin">${up?'Uploaded':'Pending'}</span></div>
+      <div class="sub2">${plural(x.count)} · ${x.adds||0} new · ${x.updates||0} changed</div>
+      <div class="sub2">Exported by ${esc(x.by||'someone')}, ${esc(fmtWhen(x.at))}</div>
+      ${up?`<div class="sub2">Uploaded by ${esc(x.uploadedBy||'someone')}, ${esc(fmtWhen(x.uploadedAt))}</div>`:''}
+      <div class="xf-b">
+        ${x.rows?'<button type="button" data-act="dl">Download</button>':''}
+        ${up?'':'<button type="button" class="primary" data-act="up">Mark as uploaded</button>'}
+        ${canDel?'<button type="button" class="link" data-act="del">Delete</button>':''}
+      </div></li>`;}).join('');
+}
+$('xf-list').addEventListener('click',async e=>{
+  const b=e.target.closest('button[data-act]');if(!b)return;
+  const x=XF.find(y=>y.id===b.closest('li').dataset.id);if(!x)return;
+  const P=window.PenApp;
+  if(b.dataset.act==='dl'){
+    try{
+      const url=URL.createObjectURL(new Blob([toXlsxBuffer(unpackRows(x.rows))],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      const a=document.createElement('a');a.href=url;a.download=x.name||'Penalties_Export.xlsx';document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),4000);
+    }catch(err){say('bad','Could not build the file: '+(err&&err.message?err.message:'Unknown error'));}
+  }else if(b.dataset.act==='up'){
+    const c=await choose('Mark as uploaded',`Confirm that <b>${esc(x.name)}</b> (${plural(x.count)}) has been uploaded to the airline system. Your colleagues will see it as done.`,[{v:'cancel',t:'Cancel'},{v:'ok',t:'Yes, uploaded',cls:'primary'}]);
+    if(c==='ok'){try{await P.markUploaded(x.id);}catch(err){say('bad','Could not update: '+(err&&err.message?err.message:'Unknown error'));}}
+  }else if(b.dataset.act==='del'){
+    const c=await choose('Delete export',`Remove <b>${esc(x.name)}</b> from the list? This does not affect the airline system.`,[{v:'cancel',t:'Cancel'},{v:'ok',t:'Delete',cls:'primary'}]);
+    if(c==='ok'){try{await P.removeExport(x.id);}catch(err){say('bad','Could not delete: '+(err&&err.message?err.message:'Unknown error'));}}
+  }
+});
 function exportRows(){
   const {rows}=generateRows(state.batch.map(b=>b.rule),state.existing);
   return $('skip-same').checked?rows.filter(r=>r.change!=='Same'):rows;
@@ -812,7 +870,7 @@ $('btn-export').addEventListener('click',async()=>{
   try{if(window.PenApp.guard)hit=await window.PenApp.guard(rows.map(rowSig));}catch(e){console.warn(e);}
   if(hit&&hit.dups.size){
     const dupRows=rows.filter(r=>hit.dups.has(rowSig(r))),rest=rows.length-dupRows.length;
-    const who=hit.exports.slice(0,3).map(x=>`<li>${esc(x.by||'Someone')} on ${esc(fmtWhen(x.at))}: ${plural(x.common)}</li>`).join('');
+    const who=hit.exports.slice(0,3).map(x=>`<li>${esc(x.by||'Someone')} on ${esc(fmtWhen(x.at))}: ${plural(x.common)} (${x.status==='uploaded'?'already uploaded':'not uploaded yet, see Exported files'})</li>`).join('');
     const c=await choose('Already exported',
       `<b>${dupRows.length} of ${rows.length} rows</b> were already exported with the same values:<ul>${who}</ul>`+(rest?`<p style="margin:10px 0 0">You can export only the ${plural(rest)} that are not exported yet.</p>`:''),
       [{v:'cancel',t:'Cancel'},{v:'all',t:'Export anyway'}].concat(rest?[{v:'rest',t:`Export only the ${plural(rest)}`,cls:'primary'}]:[]));
@@ -820,11 +878,11 @@ $('btn-export').addEventListener('click',async()=>{
     if(c==='rest')rows=rows.filter(r=>!hit.dups.has(rowSig(r)));
   }
   const name=await saveFile(rows);
-  if(name&&window.PenApp.log){try{await window.PenApp.log({count:rows.length,sigs:rows.map(rowSig),name});}catch(e){console.warn(e);}}
+  if(name&&window.PenApp.log){try{await window.PenApp.log({count:rows.length,sigs:rows.map(rowSig),name,adds:rows.filter(r=>r.change==='New').length,updates:rows.filter(r=>r.change!=='New').length,rows:packRows(rows)});}catch(e){console.warn(e);}}
 });
 refresh();loadBuiltin();
 /* Hooks for the optional cloud layer (cloud.js, standalone hosting only) */
-window.PenApp={state,fixFare,refresh,drawPen,ensureNoShow,loadBuiltin,redrawPickers(){
+window.PenApp={setExports(list){XF=list;drawExports();},state,fixFare,refresh,drawPen,ensureNoShow,loadBuiltin,redrawPickers(){
   /* The reference lists can change after load (legs added or deleted in Settings): rebuild the pickers and drop selections that no longer exist. */
   for(const l of [...state.legs])if(!CODE.leg.has(l))state.legs.delete(l);
   for(const f of [...state.fares])if(!CODE.fare.has(f))state.fares.delete(f);
