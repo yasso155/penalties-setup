@@ -7,7 +7,7 @@ import {firebaseConfig} from './firebase-config.js';
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {mountLogin,resolveRole,applyRole,fullSignOut,enforceLocalOwner} from './access.js';
-import {getDatabase,ref,get,set,update,onValue}
+import {getDatabase,ref,get,set,update,onValue,push,query,orderByChild,startAt,limitToLast}
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
 if(!firebaseConfig.apiKey||!firebaseConfig.databaseURL){console.info('Firebase not configured: running in local mode.');}
@@ -129,6 +129,41 @@ function start(){
     if(P.redrawPickers)P.redrawPickers();
     P.refresh();
     listen();
+    installExportLog();
+  }
+
+  /* ---------- export log: warns when the same rows were already exported (by anyone) ---------- */
+  const WINDOW_MS=14*24*3600*1000;
+  const fmt=t=>new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  async function recentExports(){
+    const s=await get(query(R('exports'),orderByChild('at'),startAt(Date.now()-WINDOW_MS)));
+    const out=[];if(s.exists())s.forEach(c=>{const v=c.val();if(v&&typeof v.sigs==='string')out.push(v);});
+    return out.sort((a,b)=>b.at-a.at);
+  }
+  async function showLastExport(){
+    const el=$('last-export');if(!el)return;
+    try{
+      const l=(await recentExports())[0];
+      if(!l){el.hidden=true;return;}
+      el.hidden=false;el.textContent=`Last export: ${l.by||'someone'}, ${fmt(l.at)} (${l.count} rows)`;
+    }catch(e){el.hidden=true;}
+  }
+  function installExportLog(){
+    P.guard=async sigs=>{
+      const list=await recentExports(),dups=new Set(),exports=[];
+      const mine=new Set(sigs);
+      for(const x of list){
+        const common=x.sigs.split(',').filter(h=>mine.has(h));
+        if(common.length){common.forEach(h=>dups.add(h));exports.push({by:x.by,at:x.at,common:common.length});}
+      }
+      return {dups,exports};
+    };
+    P.log=async({count,sigs,name})=>{
+      const u=auth.currentUser;
+      await set(push(R('exports')),{uid:u.uid,by:u.email||'',at:Date.now(),count,name:name||'',sigs:sigs.join(',')});
+      showLastExport();
+    };
+    showLastExport();
   }
 
   /* ---------- realtime: other users' imports and rate changes ---------- */

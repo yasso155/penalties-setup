@@ -32,6 +32,16 @@
         ".read": "auth != null && auth.uid === $uid && (auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer'))",
         ".write": "auth != null && auth.uid === $uid && (auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer'))"
       }
+    },
+    "exports": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer')",
+      ".indexOn": [
+        "at"
+      ],
+      "$id": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor' || root.child('users').child(auth.uid).child('role').val() === 'viewer') && !data.exists() && newData.child('uid').val() === auth.uid",
+        ".validate": "newData.hasChildren(['uid','by','at','count','sigs']) && newData.child('at').isNumber() && newData.child('count').isNumber()"
+      }
     }
   }
 }

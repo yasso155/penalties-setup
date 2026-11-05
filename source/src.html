@@ -119,6 +119,20 @@ td.latin,th.latin{direction:ltr;text-align:left}
 .num.mod:focus-visible{outline-color:var(--mod)} .num.ref:focus-visible{outline-color:var(--ref)}
 .num.bad{border-color:var(--bad)}
 td.v-mod{color:var(--mod);font-weight:500} td.v-ref{color:var(--ref);font-weight:500}
+.sum{margin:0 0 10px;font-size:14px;line-height:1.5}
+.sum .lead{font-weight:600;font-size:15px;display:block;margin-bottom:2px}
+.sum .empty{color:var(--muted)}
+.skip{display:flex;gap:10px;align-items:flex-start;margin:12px 0 0;font-size:13.5px;cursor:pointer}
+.skip input{margin-top:3px;flex:none}
+.skip small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:1px}
+.last-ex{color:var(--muted);font-size:12.5px;margin:-4px 0 12px}
+.last-ex[hidden]{display:none}
+.dlg-bg{position:fixed;inset:0;z-index:2500;background:rgba(10,15,25,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.dlg{width:min(460px,100%);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.dlg h3{margin:0 0 8px;font-size:17px}
+.dlg-m{font-size:14px;line-height:1.55;color:var(--ink)}
+.dlg-m ul{margin:8px 0 0;padding-left:18px;color:var(--muted)}
+.dlg-b{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
 .act{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;font-size:13px}
 .act:empty{display:none}
 .existing{border:1px dashed var(--line);border-radius:8px;padding:12px;margin:14px 0;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
@@ -257,19 +271,20 @@ button.link{min-height:0}
 
     <aside class="col-side">
       <section class="card" aria-labelledby="h-batch">
-        <div class="card-h"><h2 id="h-batch">Current file</h2><button class="link" id="btn-clear" type="button">Clear all</button></div>
+        <div class="card-h"><h2 id="h-batch">Export</h2><button class="link" id="btn-clear" type="button">Clear all</button></div>
         <div class="tot">
           <div><span class="big" id="tot-rows">0</span><small>rows</small></div>
           <div><span class="big" id="tot-rules">0</span><small>groups</small></div>
         </div>
+        <div class="sum" id="sum"></div>
         <div class="act" id="act"></div>
         <ul class="batch-list" id="batch-list"></ul>
+        <label class="skip"><input type="checkbox" id="skip-same" checked><span><b>Skip unchanged rows</b><small>Rows that already have these exact values in the booking system are left out.</small></span></label>
         <div class="existing">
-          <div class="ex-row"><b>Existing penalties</b><button class="link" id="ex-clear" type="button" hidden>Remove</button></div>
+          <div class="ex-row"><b>Existing penalties</b></div>
           <div class="ex-s" id="ex-status"></div>
-          <button type="button" id="ex-btn">Import export file</button>
-          <input type="file" id="ex-file" class="vh" accept=".xlsx,.xls" tabindex="-1" aria-label="Import export file">
         </div>
+        <div class="ex-s last-ex" id="last-export" hidden></div>
         <div class="add-bar"><button class="primary" id="btn-export" type="button">Export Excel</button></div>
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </section>
@@ -347,6 +362,12 @@ function annotate(rows,existing){
     } else {r.action='Add'; r.id=undefined; r.change='New';}
   }
   return rows;
+}
+/* Short fingerprint of a row (identity + values): the same penalty with the same values always gives the same fingerprint. */
+function rowSig(r){
+  const t=[rowKey(r.ptype,r.fare,r.leg,r.pax,FIXED.atype,r.ba,r.from,r.to,r.cur),Number(r.modAmt),r.modMode,Number(r.refAmt),r.refMode].join('|');
+  let h=2166136261;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
+  return h.toString(36);
 }
 function generateRows(batch,existing){
   const map=new Map(); let overridden=0;
@@ -623,7 +644,11 @@ function drawPreview(){
 /* --- Batch --- */
 function drawBatch(){
   const {rows,overridden,changed,same,adds}=generateRows(state.batch.map(b=>b.rule),state.existing);
-  $('act').innerHTML=rows.length?`<span class="tag chg latin">${changed} Changed</span><span class="tag same latin">${same} Same</span><span class="tag add latin">${adds} New</span>`:'';
+  const skip=$('skip-same').checked,out=rows.length-(skip?same:0);
+  $('sum').innerHTML=!rows.length?'<span class="empty">Nothing to export yet. Pick fare classes and legs, then add them to the file.</span>'
+    :out?`<span class="lead">${plural(out)} will be exported</span>`:'<span class="lead">Nothing to export</span>All rows are unchanged. Untick "Skip unchanged rows" to export them anyway.';
+  $('act').innerHTML=rows.length?`<span class="tag add latin">${adds} New</span><span class="tag chg latin">${changed} Changed</span><span class="tag same latin">${same} Unchanged${skip&&same?' (left out)':''}</span>`:'';
+  $('btn-export').textContent=out?`Export ${plural(out)}`:'Export Excel';
   $('tot-rows').textContent=rows.length; $('tot-rules').textContent=state.batch.length;
   $('batch-list').innerHTML=state.batch.length?state.batch.map((b,i)=>{
     const r=b.rule,n=ruleRows(r).length,bf=r.pen.Before,af=r.pen.After;
@@ -634,7 +659,7 @@ function drawBatch(){
       ${r.noshow?`<div class="sub2 latin">NoShow <span class="v-mod">${fmtPen(r.noshow.mod.amt,r.noshow.mod.mode,r.cur)}</span> / <span class="v-ref">${fmtPen(r.noshow.ref.amt,r.noshow.ref.mode,r.cur)}</span></div>`:''}</div>
       <button class="link" type="button" data-del="${i}" aria-label="Delete group">Delete</button></li>`;}).join('')
     :'<li class="empty-note" style="padding:6px 0">Empty</li>';
-  $('btn-export').disabled=!rows.length;
+  $('btn-export').disabled=!out;
   const st=$('status');
   if(overridden){st.className='status warn';st.textContent=`${overridden} duplicate ${overridden===1?'row':'rows'}: the latest replaced the earlier one.`;}
   else if(rows.length>5000){st.className='status warn';st.textContent='The original template is sized for 5,000 rows; this file has '+rows.length+'.';}
@@ -685,8 +710,7 @@ function drawHint(){
 function drawExisting(){
   const n=state.existing.size,st=$('ex-status');
   st.className='ex-s '+(n?'good':'warn');
-  st.textContent=n?`${n} penalties loaded${state.existingName?' from '+state.existingName:''}`:'Not imported: every row will be Add.';
-  $('ex-clear').hidden=!(n&&state.imported);
+  st.textContent=n?`${n} penalties loaded${state.existingName?' from '+state.existingName:''}`:'No existing penalties loaded: every row will be Add. An admin can import them in Settings > Import IDs.';
 }
 function refresh(){drawRates();drawHint();drawExisting();drawQuick();drawPreview();drawBatch();save();}
 function say(cls,txt){const s=$('status');s.className='status '+cls;s.textContent=txt;s.dataset.keep='1';setTimeout(()=>{delete s.dataset.keep;},4000);}
@@ -744,51 +768,59 @@ $('agr-hint').addEventListener('click',e=>{
   set(P.NoShow.mod,n);set(P.NoShow.ref,n);state.noshowOn=true;
   drawPen('Before');drawPen('After');drawPen('NoShow');refresh();
 });
-$('ex-btn').addEventListener('click',()=>$('ex-file').click());
-$('ex-file').addEventListener('change',async e=>{
-  const f=e.target.files[0]; if(!f)return;
-  try{
-    const {map,count}=parseExisting(await f.arrayBuffer());
-    if(!map.size){say('bad','No penalty rows with IDs found in that file.');}
-    else{
-      // Merge: values from the new file overwrite old ones; penalties not in the file stay as they were.
-      let changed=0,added=0;
-      for(const [k,v] of map){
-        const old=state.existing.get(k);
-        if(!old)added++;
-        else if(Number(old.modAmt)!==Number(v.modAmt)||old.modMode!==v.modMode||Number(old.refAmt)!==Number(v.refAmt)||old.refMode!==v.refMode||old.id!==v.id)changed++;
-        state.existing.set(k,v);
-      }
-      state.existingName=f.name+' (latest import)';state.imported=true;saveExisting();refresh();
-      say('ok',`Saved ${count} penalties from the file: ${changed} changed, ${added} new.`);
-    }
-  }catch(err){say('bad','Could not read the file: '+(err&&err.message?err.message:'Unknown error'));}
-  e.target.value='';
-});
-$('ex-clear').addEventListener('click',()=>{state.existing=new Map();state.existingName='';state.imported=false;saveExisting();refresh();loadBuiltin();});
+$('skip-same').addEventListener('change',()=>{try{localStorage.setItem('penalties-skip-same',$('skip-same').checked?'1':'0');}catch(e){}refresh();});
+try{if(localStorage.getItem('penalties-skip-same')==='0')$('skip-same').checked=false;}catch(e){}
 $('btn-clear').addEventListener('click',()=>{if(!state.batch.length)return;state.batch=[];refresh();say('ok','File cleared.');});
 
-$('btn-export').addEventListener('click',async()=>{
-  const {rows}=generateRows(state.batch.map(b=>b.rule),state.existing); if(!rows.length)return;
+/* Small choice dialog: resolves with the value of the clicked button ('cancel' on Esc or outside click). */
+function choose(title,html,buttons){return new Promise(res=>{
+  const o=document.createElement('div');o.className='dlg-bg';
+  o.innerHTML=`<div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t"><h3 id="dlg-t">${esc(title)}</h3><div class="dlg-m">${html}</div><div class="dlg-b">${buttons.map(b=>`<button type="button" class="${b.cls||''}" data-v="${b.v}">${esc(b.t)}</button>`).join('')}</div></div>`;
+  const k=e=>{if(e.key==='Escape')done('cancel');};
+  const done=v=>{o.remove();document.removeEventListener('keydown',k);res(v);};
+  o.addEventListener('click',e=>{const v=e.target.dataset&&e.target.dataset.v;if(v)done(v);else if(e.target===o)done('cancel');});
+  document.addEventListener('keydown',k);document.body.appendChild(o);
+  (o.querySelector('button.primary')||o.querySelector('button')).focus();
+});}
+const fmtWhen=t=>new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+function exportRows(){
+  const {rows}=generateRows(state.batch.map(b=>b.rule),state.existing);
+  return $('skip-same').checked?rows.filter(r=>r.change!=='Same'):rows;
+}
+async function saveFile(rows){
   let dl=null; try{dl=window.claude?await claude.use('downloads'):null;}catch(e){}
   const d=new Date(),p=n=>String(n).padStart(2,'0');
   const name=`Penalties_Export_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}.xlsx`;
-  if(!dl){  // standalone hosting (e.g. GitHub Pages): plain browser download
-    try{
+  try{
+    if(!dl){  // standalone hosting: plain browser download
       const url=URL.createObjectURL(new Blob([toXlsxBuffer(rows)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
       const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
       setTimeout(()=>URL.revokeObjectURL(url),4000);
-      say('ok',`Saved ${name} (${plural(rows.length)}).`);
-    }catch(err){say('bad','Could not save the file: '+(err&&err.message?err.message:'Unknown error'));}
-    return;
-  }
-  try{
-    await dl.save({filename:name,data:toXlsxBuffer(rows)});
+    } else await dl.save({filename:name,data:toXlsxBuffer(rows)});
     say('ok',`Saved ${name} (${plural(rows.length)}).`);
+    return name;
   }catch(err){
     if(err&&err.code==='declined')say('warn','Save cancelled.');
     else say('bad','Could not save the file: '+(err&&err.message?err.message:'Unknown error'));
+    return null;
   }
+}
+$('btn-export').addEventListener('click',async()=>{
+  let rows=exportRows(); if(!rows.length)return;
+  /* Duplicate guard (cloud.js): has someone already exported these exact rows recently? */
+  let hit=null;
+  try{if(window.PenApp.guard)hit=await window.PenApp.guard(rows.map(rowSig));}catch(e){console.warn(e);}
+  if(hit&&hit.dups.size){
+    const dupRows=rows.filter(r=>hit.dups.has(rowSig(r))),rest=rows.length-dupRows.length;
+    const who=hit.exports.slice(0,3).map(x=>`<li>${esc(x.by||'Someone')} on ${esc(fmtWhen(x.at))}: ${plural(x.common)}</li>`).join('');
+    const c=await choose('Already exported',
+      `<b>${dupRows.length} of ${rows.length} rows</b> were already exported with the same values:<ul>${who}</ul>`+(rest?`<p style="margin:10px 0 0">You can export only the ${plural(rest)} that are not exported yet.</p>`:''),
+      [{v:'cancel',t:'Cancel'},{v:'all',t:'Export anyway'}].concat(rest?[{v:'rest',t:`Export only the ${plural(rest)}`,cls:'primary'}]:[]));
+    if(c==='cancel')return;
+    if(c==='rest')rows=rows.filter(r=>!hit.dups.has(rowSig(r)));
+  }
+  const name=await saveFile(rows);
+  if(name&&window.PenApp.log){try{await window.PenApp.log({count:rows.length,sigs:rows.map(rowSig),name});}catch(e){console.warn(e);}}
 });
 refresh();loadBuiltin();
 /* Hooks for the optional cloud layer (cloud.js, standalone hosting only) */
